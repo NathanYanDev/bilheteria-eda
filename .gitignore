@@ -1,0 +1,16 @@
+# Segredos (URL do broker com usuário e senha)
+.env
+
+# Ambiente virtual e cache do Python
+.venv/
+__pycache__/
+*.pyc
+
+# Banco SQLite gerado (inclui os arquivos -wal e -shm do modo WAL)
+data/*.db*
+
+# Editores / SO
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
