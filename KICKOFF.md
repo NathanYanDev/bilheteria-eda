@@ -23,18 +23,18 @@ Para as próximas: `Execute a Fase N do KICKOFF.md.`
 
 ## Fase 0: Esqueleto do repositório
 
-- [ ] Estrutura de pastas do `CLAUDE.md`
-- [ ] `requirements.txt` (flask, pika, python-dotenv)
-- [ ] `.env.example` (`AMQP_URL=`, `PAYMENT_DELAY=2`, `DB_PATH=data/bilheteria.db`)
-- [ ] `.gitignore` (`.env`, `.venv/`, `__pycache__/`, `data/*.db*`)
-- [ ] `README.md` com esqueleto (seções: visão geral, arquitetura, como rodar, testes de demonstração)
+- [x] Estrutura de pastas do `CLAUDE.md`
+- [x] `requirements.txt` (flask, pika, python-dotenv)
+- [x] `.env.example` (`AMQP_URL=`, `PAYMENT_DELAY=2`, `DB_PATH=data/bilheteria.db`)
+- [x] `.gitignore` (`.env`, `.venv/`, `__pycache__/`, `data/*.db*`)
+- [x] `README.md` com esqueleto (seções: visão geral, arquitetura, como rodar, testes de demonstração)
 
 **Pronto quando:** `pip install -r requirements.txt` funciona em um venv limpo.
 
 ## Fase 1: Base de mensageria e topologia _(Enunciado, Etapa 1: infraestrutura)_
 
-- [ ] `workers/common.py`: carregar `.env`, `get_connection()`, `publish_event(channel, event_type, reserva_id, payload)` com envelope + `delivery_mode=2`, helper de log com nome do serviço + pid, helper `run_consumer(queue, callback)` com `prefetch_count=1`, `auto_ack=False` e loop de reconexão simples
-- [ ] `workers/setup_broker.py`: declara as 2 exchanges, as 6 filas e todos os bindings da tabela (idempotente, pode rodar várias vezes)
+- [x] `workers/common.py`: carregar `.env`, `get_connection()`, `publish_event(channel, event_type, reserva_id, payload)` com envelope + `delivery_mode=2`, helper de log com nome do serviço + pid, helper `run_consumer(queue, callback)` com `prefetch_count=1`, `auto_ack=False` e loop de reconexão simples
+- [x] `workers/setup_broker.py`: declara as 2 exchanges, as 6 filas e todos os bindings da tabela (idempotente, pode rodar várias vezes)
 
 **Pronto quando:** após rodar o setup, o painel do CloudAMQP mostra as exchanges, as filas (com feature `DLX`) e os bindings exatamente como na tabela.
 
