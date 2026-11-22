@@ -43,6 +43,8 @@ python workers/assentos_service.py # um terminal por worker
 python workers/payment_service.py  # rodar 2x para a demonstração de escala
 ```
 
+A API é iniciada a partir da raiz (`python api/app.py`). Ela coloca a pasta `workers/` no `sys.path` e importa `db` e `common` como módulos soltos, do mesmo jeito que os scripts dos workers. Não há pacote instalável.
+
 ## Testes de demonstração
 
 > _A preencher (Fase 7)._

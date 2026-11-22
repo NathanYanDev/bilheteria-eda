@@ -40,19 +40,19 @@ Para as próximas: `Execute a Fase N do KICKOFF.md.`
 
 ## Fase 2: Banco de dados
 
-- [ ] `workers/db.py`: conexão SQLite (WAL, timeout), schema e `--reset` com seed
-- [ ] Tabelas: `eventos`, `assentos (evento_id, numero, status, reserva_id)`, `reservas`, `pagamentos (reserva_id PK)`, `ingressos (reserva_id UNIQUE)`
-- [ ] Seed: 2 eventos com 20–30 assentos cada (o suficiente para rajadas de 10)
+- [x] `workers/db.py`: conexão SQLite (WAL, timeout), schema e `--reset` com seed
+- [x] Tabelas: `eventos`, `assentos (evento_id, numero, status, reserva_id)`, `reservas`, `pagamentos (reserva_id PK)`, `ingressos (reserva_id UNIQUE)`
+- [x] Seed: 2 eventos com 20–30 assentos cada (o suficiente para rajadas de 10)
 
 **Pronto quando:** `python workers/db.py --reset` cria o banco e um SELECT mostra eventos e assentos livres.
 
 ## Fase 3: API Flask + Frontend _(Etapa 1: produtor)_
 
-- [ ] `GET /api/eventos`, `GET /api/eventos/<id>/assentos`
-- [ ] `POST /api/reservas`: valida (evento existe, assento existe, nome, e-mail, cartão com 16 dígitos) → grava `EM_PROCESSAMENTO` → publica `reserva.criada` (com publisher confirm) → **202** com `reserva_id`. Payload inválido → 400 **sem** publicar.
-- [ ] `GET /api/reservas/<id>`: status atual
-- [ ] Frontend: escolher evento → mapa de assentos (livre/bloqueado/vendido) → formulário → mostra "Reserva recebida / Em processamento" na hora → polling do status a cada 1 s até um status final
-- [ ] Botão **"Teste de rajada"**: dispara 10 reservas para assentos livres diferentes (necessário para a Etapa 5, já que o enunciado exige a rajada _pela aplicação web_)
+- [x] `GET /api/eventos`, `GET /api/eventos/<id>/assentos`
+- [x] `POST /api/reservas`: valida (evento existe, assento existe, nome, e-mail, cartão com 16 dígitos) → grava `EM_PROCESSAMENTO` → publica `reserva.criada` (com publisher confirm) → **202** com `reserva_id`. Payload inválido → 400 **sem** publicar.
+- [x] `GET /api/reservas/<id>`: status atual
+- [x] Frontend: escolher evento → mapa de assentos (livre/bloqueado/vendido) → formulário → mostra "Reserva recebida / Em processamento" na hora → polling do status a cada 1 s até um status final
+- [x] Botão **"Teste de rajada"**: dispara 10 reservas para assentos livres diferentes (necessário para a Etapa 5, já que o enunciado exige a rajada _pela aplicação web_)
 
 **Pronto quando:** uma reserva retorna 202 em menos de 1 s e a mensagem aparece em `Ready` nas filas `q.assentos`, `q.notificacoes` e `q.status` (workers ainda desligados).
 

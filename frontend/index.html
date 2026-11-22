@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bilheteria</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Bilheteria</h1>
+      <p>A reserva é aceita na hora. O pagamento e o ingresso seguem em segundo plano.</p>
+    </header>
+
+    <section>
+      <label for="evento">Evento</label>
+      <select id="evento">
+        <option value="">Carregando…</option>
+      </select>
+      <p id="evento-info"></p>
+    </section>
+
+    <section>
+      <h2>Assentos</h2>
+      <div id="mapa" class="mapa"></div>
+      <p class="legenda">
+        <span class="assento livre"></span> livre
+        <span class="assento bloqueado"></span> bloqueado
+        <span class="assento vendido"></span> vendido
+      </p>
+    </section>
+
+    <section>
+      <h2>Reserva</h2>
+      <form id="form">
+        <label for="nome">Nome</label>
+        <input id="nome" name="nome" autocomplete="name" required>
+
+        <label for="email">E-mail</label>
+        <input id="email" name="email" type="email" autocomplete="email" required>
+
+        <label for="cartao">Cartão fictício (16 dígitos)</label>
+        <input id="cartao" name="cartao" inputmode="numeric" maxlength="19" placeholder="4111111111111111" required>
+
+        <button type="submit" id="enviar">Reservar assento</button>
+      </form>
+      <button type="button" id="rajada">Teste de rajada</button>
+      <p class="ajuda">A rajada envia 10 reservas para assentos livres diferentes, com cartão fictício.</p>
+    </section>
+
+    <section>
+      <h2>Acompanhamento</h2>
+      <div id="status" class="status">Nenhuma reserva ainda.</div>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
