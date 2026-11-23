@@ -58,18 +58,18 @@ Para as próximas: `Execute a Fase N do KICKOFF.md.`
 
 ## Fase 4: assentos_service _(Etapas 2 e 3)_
 
-- [ ] `reserva.criada` → UPDATE atômico → publica `assento.reservado` ou `assento.indisponivel`
-- [ ] `pagamento.aprovado` → BLOQUEADO → VENDIDO
-- [ ] `pagamento.recusado` → libera o assento (compensação)
-- [ ] Idempotência conforme o `CLAUDE.md`; payload inválido → nack para DLQ
+- [x] `reserva.criada` → UPDATE atômico → publica `assento.reservado` ou `assento.indisponivel`
+- [x] `pagamento.aprovado` → BLOQUEADO → VENDIDO
+- [x] `pagamento.recusado` → libera o assento (compensação)
+- [x] Idempotência conforme o `CLAUDE.md`; payload inválido → nack para DLQ
 
 **Pronto quando:** duas reservas para o **mesmo assento** resultam em uma `assento.reservado` e uma `assento.indisponivel`, mesmo com duas instâncias do serviço rodando.
 
 ## Fase 5: payment_service _(Etapas 2, 4 e 5)_
 
-- [ ] Consome `assento.reservado`, aplica as regras de cartão da tabela do `CLAUDE.md`, com atraso de `PAYMENT_DELAY`
-- [ ] Recusa → `pagamento.recusado` + ack; fraude/payload inválido → `basic_nack(requeue=False)`
-- [ ] Log com pid em cada mensagem
+- [x] Consome `assento.reservado`, aplica as regras de cartão da tabela do `CLAUDE.md`, com atraso de `PAYMENT_DELAY`
+- [x] Recusa → `pagamento.recusado` + ack; fraude/payload inválido → `basic_nack(requeue=False)`
+- [x] Log com pid em cada mensagem
 
 **Pronto quando:** cartão `...0000` libera o assento, cartão `9999...` aparece em `q.dlq`, e duas instâncias dividem uma rajada de 10.
 

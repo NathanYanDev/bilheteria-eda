@@ -45,6 +45,17 @@ python workers/payment_service.py  # rodar 2x para a demonstração de escala
 
 A API é iniciada a partir da raiz (`python api/app.py`). Ela coloca a pasta `workers/` no `sys.path` e importa `db` e `common` como módulos soltos, do mesmo jeito que os scripts dos workers. Não há pacote instalável.
 
+### Testes automatizados e atalhos (Fases 4 e 5)
+
+```bash
+python -m unittest discover -s testes -v   # testes unitários (não precisam do broker nem do banco real)
+python testes/antes_de_testar.py           # mostra filas/consumidores: LIVRE, ATENÇÃO ou PARE
+python testes/subir_tudo.py                # API + assentos_service + 2 payment_service; Ctrl+C desliga tudo
+```
+
+- O broker é compartilhado, mas cada integrante tem o próprio SQLite: **uma pessoa testa por vez** (rode o `antes_de_testar.py` antes).
+- Na página, a seção "Testes de assento e pagamento" tem botões de cartão aprovado, recusado (`...0000`), fraude (`9999...`) e disputa de 2 pessoas no mesmo assento. Eles acompanham a cor do assento, então funcionam antes da Fase 6.
+
 ## Testes de demonstração
 
 > _A preencher (Fase 7)._
