@@ -1,7 +1,7 @@
-"""Liga a API e todos os workers das Fases 4 e 5 num terminal só (atalho para testes).
+"""Liga a API e todos os workers (Fases 4 a 6) num terminal só (atalho para testes).
 
 Uso (a partir da raiz, com o .venv ativado):
-    python testes/subir_tudo.py                 # API + assentos + 2 payment_service
+    python testes/subir_tudo.py                 # API + todos os workers (2 payment_service)
     python testes/subir_tudo.py --pagamentos 3  # escolhe quantas réplicas do pagamento
 Ctrl+C desliga tudo. Para o vídeo, prefira um terminal por serviço.
 """
@@ -82,7 +82,7 @@ def _parar(*_):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Sobe a API e os workers das Fases 4 e 5.")
+    parser = argparse.ArgumentParser(description="Sobe a API e todos os workers.")
     parser.add_argument("--pagamentos", type=int, default=2, help="réplicas do payment_service (padrão: 2)")
     args = parser.parse_args()
 
@@ -100,6 +100,8 @@ def main():
     servicos.append(iniciar("assentos_service", "workers/assentos_service.py"))
     for _ in range(max(1, args.pagamentos)):
         servicos.append(iniciar("payment_service", "workers/payment_service.py"))
+    for nome in ("emissao_service", "notificacao_service", "status_service"):
+        servicos.append(iniciar(nome, f"workers/{nome}.py"))
 
     print(f"[subir_tudo] {len(servicos)} processo(s) ligado(s). Abra http://localhost:{PORTA_API}  |  Ctrl+C desliga tudo.\n",
           flush=True)
