@@ -9,6 +9,9 @@ __pycache__/
 # Banco SQLite gerado (inclui os arquivos -wal e -shm do modo WAL)
 data/*.db*
 
+# Saída dos testes de ponta a ponta (logs dos processos e backup das filas do broker)
+logs/
+
 # Editores / SO
 .vscode/
 .idea/

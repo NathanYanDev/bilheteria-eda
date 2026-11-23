@@ -11,6 +11,7 @@ verdade é setup_broker.py. Os consumidores só consomem filas que já existem.
 
 import json
 import os
+import sqlite3
 import sys
 import time
 import uuid
@@ -164,6 +165,12 @@ def run_consumer(service, queue, callback):
         seguro no broker.
       - Reconexão: se a conexão cair, espera RECONNECT_DELAY segundos e volta.
         Mensagens que estavam sem ack são reentregues pelo broker.
+      - Erro TEMPORÁRIO do banco (sqlite3.OperationalError, ex.: "database is
+        locked" depois do timeout numa rajada): não é culpa da mensagem, então
+        ela NÃO vai para a DLQ. O consumidor fecha a conexão sem ack/nack e o
+        broker reentrega a mensagem quando ele reconectar (RECONNECT_DELAY serve
+        de espera antes da nova tentativa). Os serviços são idempotentes, então
+        reprocessar é seguro.
     """
 
     def on_message(channel, method, properties, body):
@@ -181,6 +188,12 @@ def run_consumer(service, queue, callback):
             # Problema de conexão/canal (ex.: o publish falhou). Não dá para
             # dar ack nem nack; sobe para o loop de reconexão. Como não houve
             # ack, o broker vai reentregar esta mensagem.
+            raise
+        except sqlite3.OperationalError as exc:
+            # Banco ocupado/indisponível agora: erro temporário, não permanente.
+            # Mandar para a DLQ perderia uma reserva válida. Sobe para o loop de
+            # reconexão, que fecha a conexão sem ack -> o broker reentrega.
+            log(service, f"{entrada}  |  ERRO temporário no banco: {exc}  |  sem ack, será reentregue")
             raise
         except Exception as exc:  # bug ou erro inesperado
             # Também vai para a DLQ: devolver para a fila poderia gerar um loop
@@ -217,6 +230,8 @@ def run_consumer(service, queue, callback):
                 log(service, f"canal fechado pelo broker: {exc}")
         except pika.exceptions.AMQPError as exc:
             log(service, f"conexão perdida: {exc!r}")
+        except sqlite3.OperationalError:
+            pass  # já registrado no on_message; o finally fecha a conexão (mensagem volta para a fila)
         finally:
             if connection and connection.is_open:
                 try:

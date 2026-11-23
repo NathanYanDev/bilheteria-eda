@@ -43,6 +43,7 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _pub_lock = threading.Lock()
 _connection = None
 _channel = None
+_ja_conectou = False  # só para o log dizer "conectado" na 1ª vez e "reconectado" depois
 
 
 def _fechar_publicador():
@@ -62,7 +63,7 @@ def _fechar_publicador():
 
 def _canal():
     """Devolve o canal aberto, reconectando se o anterior tiver caído."""
-    global _connection, _channel
+    global _connection, _channel, _ja_conectou
     if _channel is not None and _channel.is_open:
         return _channel
     _fechar_publicador()
@@ -71,6 +72,8 @@ def _canal():
     # confirm_delivery: basic_publish só retorna depois que o broker gravou
     # a mensagem. Sem isso, o 202 poderia sair e a mensagem se perder no caminho.
     _channel.confirm_delivery()
+    common.log("api", "publicador reconectado ao broker" if _ja_conectou else "publicador conectado ao broker")
+    _ja_conectou = True
     return _channel
 
 
@@ -83,6 +86,9 @@ def publicar_reserva_criada(reserva_id, payload):
                 common.publish_event(_canal(), "reserva.criada", reserva_id, payload)
                 return
             except pika.exceptions.AMQPError as exc:
+                # Típico depois de muito tempo ociosa: o broker derrubou a conexão
+                # por falta de heartbeat. Fecha e a 2ª volta do for reconecta.
+                common.log("api", f"publicação falhou ({type(exc).__name__}): reconectando")
                 ultimo = exc
                 _fechar_publicador()
         raise ultimo

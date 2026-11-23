@@ -6,6 +6,7 @@ mensagem, falha no parse e faz nack(requeue=False): ela vai para q.dlq.
 """
 
 import sys
+import uuid
 from pathlib import Path
 
 import pika
@@ -20,7 +21,14 @@ ch.basic_publish(
     exchange=EXCHANGE,
     routing_key="reserva.criada",
     body=b'{"event_id": "x", "event_type": "reserva.criada", "payload": {quebrado',  # JSON truncado
-    properties=pika.BasicProperties(delivery_mode=pika.DeliveryMode.Persistent, content_type="application/json"),
+    # Corpo quebrado, mas as propriedades seguem a regra de toda publicação:
+    # persistente, JSON e com message_id (para achar a mensagem na DLQ).
+    properties=pika.BasicProperties(
+        delivery_mode=pika.DeliveryMode.Persistent,
+        content_type="application/json",
+        message_id=str(uuid.uuid4()),
+    ),
 )
 conn.close()
-print("JSON inválido publicado em reserva.criada. Confira q.dlq no painel.")
+print("JSON inválido publicado em reserva.criada. Confira q.dlq no painel:")
+print("chegam 3 cópias, uma de cada fila que assina reserva.criada (assentos, notificações e status).")

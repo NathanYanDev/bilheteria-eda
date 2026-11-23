@@ -97,9 +97,16 @@ function pararPoll() {
   }
 }
 
+// Sem mudança de status por este tempo, a tela explica o porquê. O polling NÃO para:
+// se for um serviço desligado (teste de caos), a mensagem está esperando na fila e o
+// status volta a andar quando ele religar. Se foi para a DLQ (fraude), não muda mais.
+const SEM_NOVIDADE_SEGUNDOS = 20;
+
 function acompanhar(reservaId, prefixo) {
   pararPoll();
   mostrarStatus(`${prefixo}\nReserva recebida. Em processamento.\n${reservaId}`);
+  let ultimoStatus = null;
+  let mudouEm = Date.now();
 
   async function atualizar() {
     const resposta = await fetch(`/api/reservas/${reservaId}`);
@@ -109,9 +116,23 @@ function acompanhar(reservaId, prefixo) {
       return;
     }
     const reserva = await resposta.json();
+    if (reserva.status !== ultimoStatus) {
+      ultimoStatus = reserva.status;
+      mudouEm = Date.now();
+    }
     const rotulo = ROTULOS[reserva.status] || reserva.status;
-    mostrarStatus(`${prefixo}\n${rotulo}\nAssento ${reserva.numero} · ${reservaId}`);
-    if (reserva.final || FINAIS.has(reserva.status)) pararPoll();
+    const linhas = [prefixo, rotulo, `Assento ${reserva.numero} · ${reservaId}`];
+    const parado = (Date.now() - mudouEm) / 1000 > SEM_NOVIDADE_SEGUNDOS;
+    if (reserva.final || FINAIS.has(reserva.status)) {
+      pararPoll();
+    } else if (parado) {
+      linhas.push(
+        `Sem novidades há ${Math.round((Date.now() - mudouEm) / 1000)} s. Ou um serviço está desligado ` +
+          "(a mensagem espera na fila e segue quando ele voltar), ou o pagamento foi barrado por " +
+          "suspeita de fraude (a mensagem está na q.dlq e o assento continua bloqueado)."
+      );
+    }
+    mostrarStatus(linhas.join("\n"));
     carregarAssentos();
   }
 
