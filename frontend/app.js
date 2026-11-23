@@ -191,6 +191,118 @@ rajadaEl.addEventListener("click", async () => {
   }
 });
 
+// --------------------------------------------------------------------------
+// Testes de assento e pagamento (Fases 4 e 5)
+// --------------------------------------------------------------------------
+// O status da reserva só muda quando o status_service existir. Por isso estes
+// testes acompanham a cor do assento no banco, que é o que as fases 4 e 5 alteram.
+const TESTES = {
+  aprovado: {
+    cartao: "4111111111111111",
+    titulo: "Teste: cartão aprovado",
+    terminou: (h) => h.at(-1) === "VENDIDO",
+    explicacao: "assento.reservado -> pagamento.aprovado -> assento VENDIDO.",
+  },
+  recusado: {
+    cartao: "4111111111110000",
+    titulo: "Teste: cartão recusado (sem limite)",
+    terminou: (h) => h.includes("BLOQUEADO") && h.at(-1) === "LIVRE",
+    explicacao: "pagamento.recusado -> compensação: o assento voltou a ficar LIVRE para outra pessoa.",
+  },
+  fraude: {
+    cartao: "9999111111111111",
+    titulo: "Teste: fraude",
+    // Fraude não gera evento nenhum: o assento fica BLOQUEADO. Espera passar o
+    // tempo do pagamento (~2 s) para ter certeza de que não foi vendido.
+    terminou: (h, segundos) => h.at(-1) === "BLOQUEADO" && segundos >= 6,
+    explicacao: "payment_service deu NACK: a mensagem está na q.dlq e o assento fica BLOQUEADO.",
+  },
+  disputa: {
+    cartao: "4111111111111111",
+    titulo: "Teste: 2 pessoas no mesmo assento",
+    terminou: (h) => h.at(-1) === "VENDIDO",
+    explicacao: "Só uma reserva ganhou o assento. A outra recebeu assento.indisponivel (veja o log do assentos_service).",
+  },
+};
+const LIMITE_SEGUNDOS = 20;
+const botoesTeste = [...document.querySelectorAll("[data-teste]")];
+
+function enviarReserva(numero, nome, email, cartao) {
+  return fetch("/api/reservas", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ evento_id: Number(eventoEl.value), numero, nome, email, cartao }),
+  }).then(async (resposta) => ({ ok: resposta.ok, corpo: await resposta.json() }));
+}
+
+// Guarda cada mudança de status do assento (LIVRE -> BLOQUEADO -> ...) até o teste terminar.
+function acompanharAssento(numero, teste) {
+  pararPoll();
+  const historico = ["LIVRE"];
+  const inicio = Date.now();
+
+  async function atualizar() {
+    const assentos = await fetch(`/api/eventos/${eventoEl.value}/assentos`).then((r) => r.json());
+    const atual = assentos.find((a) => a.numero === numero).status;
+    if (atual !== historico.at(-1)) historico.push(atual);
+    const segundos = (Date.now() - inicio) / 1000;
+    const linhas = [teste.titulo, `Assento ${numero}: ${historico.join(" -> ")}`];
+
+    if (teste.terminou(historico, segundos)) {
+      pararPoll();
+      linhas.push(`OK. ${teste.explicacao}`);
+    } else if (segundos > LIMITE_SEGUNDOS) {
+      pararPoll();
+      linhas.push("Tempo esgotado. Confira se o assentos_service e o payment_service estão ligados.");
+    } else {
+      linhas.push("Aguardando os workers…");
+    }
+    mostrarStatus(linhas.join("\n"), segundos > LIMITE_SEGUNDOS);
+    carregarAssentos();
+  }
+
+  pollTimer = setInterval(atualizar, 1000);
+}
+
+async function rodarTeste(tipo) {
+  const teste = TESTES[tipo];
+  const assentos = await fetch(`/api/eventos/${eventoEl.value}/assentos`).then((r) => r.json());
+  const livre = (n) => assentos.some((a) => a.numero === n && a.status === "LIVRE");
+  const numero = livre(assentoSelecionado) ? assentoSelecionado : assentos.find((a) => a.status === "LIVRE")?.numero;
+  if (!numero) {
+    mostrarStatus("Não há assento livre neste evento.", true);
+    return;
+  }
+  const nome = document.querySelector("#nome").value || "Teste";
+  const email = document.querySelector("#email").value || "teste@exemplo.com";
+
+  // Disputa: as duas reservas saem juntas (Promise.all) para o mesmo assento.
+  const pessoas = tipo === "disputa" ? ["Pessoa A", "Pessoa B"] : [nome];
+  const respostas = await Promise.all(
+    pessoas.map((p, i) => enviarReserva(numero, p, tipo === "disputa" ? `pessoa${i + 1}@exemplo.com` : email, teste.cartao))
+  );
+  const falha = respostas.find((r) => !r.ok);
+  if (falha) {
+    mostrarStatus(falha.corpo.erro || "Não foi possível reservar.", true);
+    return;
+  }
+  assentoSelecionado = null;
+  acompanharAssento(numero, teste);
+}
+
+for (const botao of botoesTeste) {
+  botao.addEventListener("click", async () => {
+    botoesTeste.forEach((b) => (b.disabled = true));
+    try {
+      await rodarTeste(botao.dataset.teste);
+    } catch (err) {
+      mostrarStatus("Falha de rede no teste.", true);
+    } finally {
+      botoesTeste.forEach((b) => (b.disabled = false));
+    }
+  });
+}
+
 eventoEl.addEventListener("change", () => {
   assentoSelecionado = null;
   carregarAssentos();

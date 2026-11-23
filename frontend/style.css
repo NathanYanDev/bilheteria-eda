@@ -49,6 +49,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 #rajada { background: #3d4f3a; }
 
+.testes { display: flex; flex-wrap: wrap; gap: 8px; }
+.testes button { margin-top: 0; background: #4a3f5c; }
+
 .mapa {
   display: grid;
   grid-template-columns: repeat(6, 1fr);

@@ -41,12 +41,24 @@
         <input id="email" name="email" type="email" autocomplete="email" required>
 
         <label for="cartao">Cartão fictício (16 dígitos)</label>
-        <input id="cartao" name="cartao" inputmode="numeric" maxlength="19" placeholder="4111111111111111" required>
+        <input id="cartao" name="cartao" inputmode="numeric" maxlength="19" placeholder="4111111111111111" required
+               pattern="([0-9] ?){15}[0-9]" title="Só números: 16 dígitos (espaços são permitidos)">
 
         <button type="submit" id="enviar">Reservar assento</button>
       </form>
       <button type="button" id="rajada">Teste de rajada</button>
       <p class="ajuda">A rajada envia 10 reservas para assentos livres diferentes, com cartão fictício.</p>
+    </section>
+
+    <section>
+      <h2>Testes de assento e pagamento</h2>
+      <div class="testes">
+        <button type="button" data-teste="aprovado">Cartão aprovado</button>
+        <button type="button" data-teste="recusado">Cartão recusado (…0000)</button>
+        <button type="button" data-teste="fraude">Fraude (9999…)</button>
+        <button type="button" data-teste="disputa">Disputa: 2 pessoas no mesmo assento</button>
+      </div>
+      <p class="ajuda">Usam o assento selecionado (ou o primeiro livre). O resultado é lido do mapa de assentos, então funciona só com o assentos_service e o payment_service ligados.</p>
     </section>
 
     <section>
