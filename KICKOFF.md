@@ -75,18 +75,18 @@ Para as próximas: `Execute a Fase N do KICKOFF.md.`
 
 ## Fase 6: emissao_service, notificacao_service, status_service _(Etapa 2)_
 
-- [ ] emissão: gera código de ingresso (ex.: `BIL-XXXXXX`), grava, publica `ingresso.emitido`
-- [ ] notificação: imprime um "e-mail" simulado por evento recebido
-- [ ] status: mapeia cada evento para o status da reserva (só avança)
-- [ ] `workers/tools/publicar_invalido.py`: publica um JSON corrompido com routing key `reserva.criada`
+- [x] emissão: gera código de ingresso (ex.: `BIL-XXXXXX`), grava, publica `ingresso.emitido`
+- [x] notificação: imprime um "e-mail" simulado por evento recebido
+- [x] status: mapeia cada evento para o status da reserva (só avança)
+- [x] `workers/tools/publicar_invalido.py`: publica um JSON corrompido com routing key `reserva.criada`
 
 **Pronto quando:** o frontend mostra a reserva indo até `CONFIRMADA`, e o script inválido termina na `q.dlq` sem travar nenhum worker.
 
 ## Fase 7: Roteiro de testes e README
 
-- [ ] README completo: pré-requisitos, `.env`, ordem de execução, comandos de cada teste
-- [ ] Seção "Roteiro da demonstração" com os 5 testes do vídeo (abaixo)
-- [ ] Revisão final com o checklist de requisitos
+- [x] README completo: pré-requisitos, `.env`, ordem de execução, comandos de cada teste
+- [x] Seção "Roteiro da demonstração" com os 5 testes do vídeo (abaixo)
+- [x] Revisão final com o checklist de requisitos
 
 ---
 
