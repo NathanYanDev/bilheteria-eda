@@ -86,7 +86,7 @@ Para as próximas: `Execute a Fase N do KICKOFF.md.`
 
 - [x] README completo: pré-requisitos, `.env`, ordem de execução, comandos de cada teste
 - [x] Seção "Roteiro da demonstração" com os 5 testes do vídeo (abaixo)
-- [x] Revisão final com o checklist de requisitos
+- [ ] Revisão final com o checklist de requisitos
 
 ---
 
