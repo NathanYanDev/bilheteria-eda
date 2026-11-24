@@ -1,7 +1,7 @@
 """
 Declara TODA a topologia do broker: exchanges, filas e bindings.
 
-É a fonte da verdade da topologia (a tabela do CLAUDE.md descreve o mesmo).
+É a fonte da verdade da topologia.
 Pode rodar quantas vezes quiser: declarar algo que já existe com os mesmos
 parâmetros não faz nada (operação idempotente).
 
@@ -22,7 +22,12 @@ FILAS = {
     "q.assentos": ["reserva.criada", "pagamento.aprovado", "pagamento.recusado"],
     "q.pagamentos": ["assento.reservado"],
     "q.emissao": ["pagamento.aprovado"],
-    "q.notificacoes": ["reserva.criada", "assento.indisponivel", "pagamento.recusado", "ingresso.emitido"],
+    "q.notificacoes": [
+        "reserva.criada",
+        "assento.indisponivel",
+        "pagamento.recusado",
+        "ingresso.emitido",
+    ],
     "q.status": ["#"],  # '#' casa com qualquer routing key: recebe todos os eventos
 }
 
@@ -71,4 +76,6 @@ if __name__ == "__main__":
             )
         raise
     except pika.exceptions.AMQPConnectionError as exc:
-        sys.exit(f"Não foi possível conectar ao broker: {exc!r}\nConfira a AMQP_URL no .env.")
+        sys.exit(
+            f"Não foi possível conectar ao broker: {exc!r}\nConfira a AMQP_URL no .env."
+        )

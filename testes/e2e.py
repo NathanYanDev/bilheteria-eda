@@ -57,7 +57,13 @@ API = "http://127.0.0.1:5000"
 LOGS = RAIZ / "logs"
 NO_WINDOWS = os.name == "nt"
 FILAS_TODAS = [*FILAS, DLQ]
-WORKERS = ["assentos_service", "payment_service", "emissao_service", "notificacao_service", "status_service"]
+WORKERS = [
+    "assentos_service",
+    "payment_service",
+    "emissao_service",
+    "notificacao_service",
+    "status_service",
+]
 FILA_DO_WORKER = {
     "assentos_service": "q.assentos",
     "payment_service": "q.pagamentos",
@@ -71,13 +77,16 @@ CARTAO_OK = "4111111111111111"
 CARTAO_SEM_LIMITE = "4111111111110000"
 CARTAO_FRAUDE = "9999111111111111"
 
-# Tabela do CLAUDE.md copiada à mão de propósito: comparar o setup_broker.py com
-# ele mesmo não provaria nada. Se a topologia mudar, atualize aqui também.
 ESPERADO = {
     "q.assentos": {"reserva.criada", "pagamento.aprovado", "pagamento.recusado"},
     "q.pagamentos": {"assento.reservado"},
     "q.emissao": {"pagamento.aprovado"},
-    "q.notificacoes": {"reserva.criada", "assento.indisponivel", "pagamento.recusado", "ingresso.emitido"},
+    "q.notificacoes": {
+        "reserva.criada",
+        "assento.indisponivel",
+        "pagamento.recusado",
+        "ingresso.emitido",
+    },
     "q.status": {"#"},
 }
 
@@ -111,7 +120,9 @@ def esperar(condicao, timeout, intervalo=0.5):
 
 
 def registrar(cid, titulo, ok, evidencias):
-    RESULTADOS.append({"id": cid, "titulo": titulo, "ok": bool(ok), "evidencias": evidencias})
+    RESULTADOS.append(
+        {"id": cid, "titulo": titulo, "ok": bool(ok), "evidencias": evidencias}
+    )
     print(f"\n{'PASS' if ok else 'FAIL'}  {cid}  {titulo}", flush=True)
     for linha in evidencias:
         print(f"      {linha}", flush=True)
@@ -121,7 +132,9 @@ def http(metodo, caminho, corpo=None, timeout=15):
     """Requisição HTTP com urllib. Devolve (status, json_ou_texto, segundos)."""
     dados = json.dumps(corpo).encode("utf-8") if corpo is not None else None
     headers = {"Content-Type": "application/json"} if dados is not None else {}
-    req = urllib.request.Request(API + caminho, data=dados, method=metodo, headers=headers)
+    req = urllib.request.Request(
+        API + caminho, data=dados, method=metodo, headers=headers
+    )
     t0 = time.perf_counter()
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -136,10 +149,20 @@ def http(metodo, caminho, corpo=None, timeout=15):
     return status, conteudo, segundos
 
 
-def reservar(numero, cartao=CARTAO_OK, nome="Teste E2E", email="e2e@exemplo.com", evento_id=1):
-    return http("POST", "/api/reservas", {
-        "evento_id": evento_id, "numero": numero, "nome": nome, "email": email, "cartao": cartao,
-    })
+def reservar(
+    numero, cartao=CARTAO_OK, nome="Teste E2E", email="e2e@exemplo.com", evento_id=1
+):
+    return http(
+        "POST",
+        "/api/reservas",
+        {
+            "evento_id": evento_id,
+            "numero": numero,
+            "nome": nome,
+            "email": email,
+            "cartao": cartao,
+        },
+    )
 
 
 def status_reserva(reserva_id):
@@ -170,13 +193,22 @@ def sql(consulta, *params):
 
 
 def assento(numero, evento_id=1):
-    rows = sql("SELECT status, reserva_id FROM assentos WHERE evento_id = ? AND numero = ?", evento_id, numero)
+    rows = sql(
+        "SELECT status, reserva_id FROM assentos WHERE evento_id = ? AND numero = ?",
+        evento_id,
+        numero,
+    )
     return rows[0] if rows else None
 
 
 def assentos_livres(evento_id=1):
-    return [r["numero"] for r in sql(
-        "SELECT numero FROM assentos WHERE evento_id = ? AND status = 'LIVRE' ORDER BY numero", evento_id)]
+    return [
+        r["numero"]
+        for r in sql(
+            "SELECT numero FROM assentos WHERE evento_id = ? AND status = 'LIVRE' ORDER BY numero",
+            evento_id,
+        )
+    ]
 
 
 def linhas_log(padrao, contem):
@@ -218,6 +250,7 @@ class Broker:
 
     def fila(self, nome):
         """(Ready, consumidores) via queue_declare(passive=True): só consulta, não cria."""
+
         def consulta(conn):
             canal = conn.channel()
             try:
@@ -226,6 +259,7 @@ class Broker:
             finally:
                 if canal.is_open:
                     canal.close()
+
         return self._tentar(consulta)
 
     def contagens(self):
@@ -240,6 +274,7 @@ class Broker:
             for fila in FILAS_TODAS:
                 canal.queue_purge(fila)
             canal.close()
+
         self._tentar(purge)
 
     def backup(self, destino):
@@ -261,18 +296,30 @@ class Broker:
                         texto, codificacao = corpo.decode("utf-8"), "utf-8"
                     except UnicodeDecodeError:
                         texto, codificacao = base64.b64encode(corpo).decode(), "base64"
-                    copia.append({
-                        "fila": fila, "exchange": metodo.exchange, "routing_key": metodo.routing_key,
-                        "redelivered": metodo.redelivered,
-                        "properties": {
-                            "message_id": props.message_id, "content_type": props.content_type,
-                            "delivery_mode": props.delivery_mode, "type": props.type, "headers": props.headers,
-                        },
-                        "body": texto, "body_encoding": codificacao,
-                    })
+                    copia.append(
+                        {
+                            "fila": fila,
+                            "exchange": metodo.exchange,
+                            "routing_key": metodo.routing_key,
+                            "redelivered": metodo.redelivered,
+                            "properties": {
+                                "message_id": props.message_id,
+                                "content_type": props.content_type,
+                                "delivery_mode": props.delivery_mode,
+                                "type": props.type,
+                                "headers": props.headers,
+                            },
+                            "body": texto,
+                            "body_encoding": codificacao,
+                        }
+                    )
                 canal.close()  # devolve (requeue) tudo o que foi lido sem ack
+
         self._tentar(ler)
-        destino.write_text(json.dumps(copia, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        destino.write_text(
+            json.dumps(copia, ensure_ascii=False, indent=2, default=str),
+            encoding="utf-8",
+        )
         return len(copia)
 
     def espiar(self, fila, filtro):
@@ -289,10 +336,17 @@ class Broker:
                     break
                 ultimo = metodo.delivery_tag
                 if filtro(corpo):
-                    achadas.append({"routing_key": metodo.routing_key, "props": props, "body": corpo})
+                    achadas.append(
+                        {
+                            "routing_key": metodo.routing_key,
+                            "props": props,
+                            "body": corpo,
+                        }
+                    )
             if ultimo is not None:
                 canal.basic_nack(delivery_tag=ultimo, multiple=True, requeue=True)
             canal.close()
+
         self._tentar(ler)
         return achadas
 
@@ -300,8 +354,14 @@ class Broker:
         def pub(conn):
             canal = conn.channel()
             canal.confirm_delivery()
-            canal.basic_publish(exchange=common.EXCHANGE, routing_key=routing_key, body=corpo, properties=props)
+            canal.basic_publish(
+                exchange=common.EXCHANGE,
+                routing_key=routing_key,
+                body=corpo,
+                properties=props,
+            )
             canal.close()
+
         self._tentar(pub)
 
     def fechar(self):
@@ -320,12 +380,17 @@ class Gerenciamento:
     def __init__(self):
         url = urllib.parse.urlparse(common.AMQP_URL)
         self.base = f"https://{url.hostname}/api"
-        self.vhost = urllib.parse.quote(urllib.parse.unquote(url.path[1:]) or "/", safe="")
+        self.vhost = urllib.parse.quote(
+            urllib.parse.unquote(url.path[1:]) or "/", safe=""
+        )
         credencial = f"{urllib.parse.unquote(url.username or '')}:{urllib.parse.unquote(url.password or '')}"
         self._auth = "Basic " + base64.b64encode(credencial.encode()).decode()
 
     def get(self, *partes):
-        caminho = "/".join(urllib.parse.quote(p, safe="") if p != "{vh}" else self.vhost for p in partes)
+        caminho = "/".join(
+            urllib.parse.quote(p, safe="") if p != "{vh}" else self.vhost
+            for p in partes
+        )
         req = urllib.request.Request(f"{self.base}/{caminho}")
         req.add_header("Authorization", self._auth)
         with urllib.request.urlopen(req, timeout=15) as resp:
@@ -353,15 +418,32 @@ class Servicos:
 
     def iniciar(self, nome, n=1, env_extra=None):
         script = "api/app.py" if nome == "api" else f"workers/{nome}.py"
-        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1", **(env_extra or {})}
+        env = {
+            **os.environ,
+            "PYTHONIOENCODING": "utf-8",
+            "PYTHONUNBUFFERED": "1",
+            **(env_extra or {}),
+        }
         log = open(self.arquivo(nome, n), "a", encoding="utf-8")
-        log.write(f"\n===== e2e {agora()}: iniciando {nome} #{n} {env_extra or ''} =====\n")
+        log.write(
+            f"\n===== e2e {agora()}: iniciando {nome} #{n} {env_extra or ''} =====\n"
+        )
         log.flush()
         # Grupo de processos próprio para conseguir derrubar a árvore inteira
         # (no Windows o python.exe do .venv é um lançador que abre outro processo).
-        extra = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if NO_WINDOWS else {"start_new_session": True}
-        proc = subprocess.Popen([sys.executable, "-u", script], cwd=RAIZ, env=env,
-                                stdout=log, stderr=subprocess.STDOUT, **extra)
+        extra = (
+            {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+            if NO_WINDOWS
+            else {"start_new_session": True}
+        )
+        proc = subprocess.Popen(
+            [sys.executable, "-u", script],
+            cwd=RAIZ,
+            env=env,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            **extra,
+        )
         self.procs[(nome, n)] = (proc, log)
         return proc
 
@@ -374,7 +456,9 @@ class Servicos:
         proc, log = self.procs.pop((nome, n))
         if proc.poll() is None:
             if NO_WINDOWS:
-                subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True)
+                subprocess.run(
+                    ["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True
+                )
             else:
                 os.killpg(proc.pid, signal.SIGKILL)
             try:
@@ -404,9 +488,13 @@ def subir_worker(svc, broker, nome, n=1, env_extra=None):
     antes = broker.consumidores(fila)
     svc.iniciar(nome, n, env_extra)
     if not esperar(lambda: broker.consumidores(fila) > antes, 30):
-        raise RuntimeError(f"{nome} #{n} não apareceu como consumidor de {fila} (veja {svc.arquivo(nome, n).name})")
+        raise RuntimeError(
+            f"{nome} #{n} não apareceu como consumidor de {fila} (veja {svc.arquivo(nome, n).name})"
+        )
     esperar(lambda: svc.pid_real(nome, n) != "?", 5)
-    info(f"{nome} #{n} conectado (pid={svc.pid_real(nome, n)}, consumidores em {fila}: {broker.consumidores(fila)})")
+    info(
+        f"{nome} #{n} conectado (pid={svc.pid_real(nome, n)}, consumidores em {fila}: {broker.consumidores(fila)})"
+    )
 
 
 def derrubar_worker(svc, broker, nome, n=1):
@@ -446,7 +534,11 @@ def fmt_filas(contagens):
 # --------------------------------------------------------------------------- #
 def parte_a():
     arquivos = [p for p in [*RAIZ.glob("api/*.py"), *RAIZ.glob("workers/**/*.py")]]
-    achados = {"auto_ack=True": [], "requeue=True": [], "basic_publish sem delivery_mode": []}
+    achados = {
+        "auto_ack=True": [],
+        "requeue=True": [],
+        "basic_publish sem delivery_mode": [],
+    }
     for arq in arquivos:
         texto = arq.read_text(encoding="utf-8")
         for i, linha in enumerate(texto.splitlines(), 1):
@@ -457,11 +549,17 @@ def parte_a():
                 achados["requeue=True"].append(f"{arq.relative_to(RAIZ)}:{i}")
         for m in re.finditer(r"basic_publish\((.*?)\n\s*\)", texto, re.S):
             if "delivery_mode" not in m.group(1):
-                linha = texto[:m.start()].count("\n") + 1
-                achados["basic_publish sem delivery_mode"].append(f"{arq.relative_to(RAIZ)}:{linha}")
+                linha = texto[: m.start()].count("\n") + 1
+                achados["basic_publish sem delivery_mode"].append(
+                    f"{arq.relative_to(RAIZ)}:{linha}"
+                )
     ok = not any(achados.values())
-    registrar("A*", "Varredura automática do código (auto_ack, requeue, delivery_mode)", ok,
-              [f"{k}: {v or 'nenhum'}" for k, v in achados.items()])
+    registrar(
+        "A*",
+        "Varredura automática do código (auto_ack, requeue, delivery_mode)",
+        ok,
+        [f"{k}: {v or 'nenhum'}" for k, v in achados.items()],
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -469,9 +567,15 @@ def parte_a():
 # --------------------------------------------------------------------------- #
 def parte_b(broker, mgmt, mgmt_ok):
     evid, diferencas = [], []
-    r = subprocess.run([sys.executable, "-u", "workers/setup_broker.py"], cwd=RAIZ, capture_output=True,
-                       text=True, encoding="utf-8", errors="replace",
-                       env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+    r = subprocess.run(
+        [sys.executable, "-u", "workers/setup_broker.py"],
+        cwd=RAIZ,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+    )
     evid.append(f"setup_broker.py exit={r.returncode}")
     evid += [f"  {linha}" for linha in r.stdout.splitlines() if linha.strip()]
     if r.returncode != 0:
@@ -479,14 +583,25 @@ def parte_b(broker, mgmt, mgmt_ok):
 
     codigo = {f: set(rks) for f, rks in FILAS.items()}
     if codigo != ESPERADO:
-        diferencas.append(f"setup_broker.FILAS difere da tabela do CLAUDE.md: {codigo} != {ESPERADO}")
+        diferencas.append(
+            f"setup_broker.FILAS difere da tabela: {codigo} != {ESPERADO}"
+        )
 
     if not mgmt_ok:
-        evid.append("API de gerenciamento indisponível: bindings verificados só pelo código e pelos testes funcionais")
+        evid.append(
+            "API de gerenciamento indisponível: bindings verificados só pelo código e pelos testes funcionais"
+        )
         # Pelo menos confirma que todas as filas existem.
         for fila in FILAS_TODAS:
-            evid.append(f"{fila}: existe (passive declare), Ready={broker.fila(fila)[0]}")
-        registrar("B", "Topologia no broker", not diferencas, evid + [f"DIFERENÇA: {d}" for d in diferencas])
+            evid.append(
+                f"{fila}: existe (passive declare), Ready={broker.fila(fila)[0]}"
+            )
+        registrar(
+            "B",
+            "Topologia no broker",
+            not diferencas,
+            evid + [f"DIFERENÇA: {d}" for d in diferencas],
+        )
         return
 
     for nome, tipo in ((common.EXCHANGE, "topic"), (common.DLX, "fanout")):
@@ -502,9 +617,13 @@ def parte_b(broker, mgmt, mgmt_ok):
         dlx = args.get("x-dead-letter-exchange")
         EXTRA["mgmt_filas"][fila] = {"durable": d.get("durable"), "arguments": args}
         ligacoes = mgmt.get("queues", "{vh}", fila, "bindings")
-        reais = sorted((b.get("source"), b.get("routing_key")) for b in ligacoes if b.get("source"))
-        evid.append(f"fila {fila}: durable={d.get('durable')} x-dead-letter-exchange={dlx} "
-                    f"bindings={[f'{s}:{rk}' for s, rk in reais]}")
+        reais = sorted(
+            (b.get("source"), b.get("routing_key")) for b in ligacoes if b.get("source")
+        )
+        evid.append(
+            f"fila {fila}: durable={d.get('durable')} x-dead-letter-exchange={dlx} "
+            f"bindings={[f'{s}:{rk}' for s, rk in reais]}"
+        )
         if d.get("durable") is not True:
             diferencas.append(f"{fila} não é durable")
         if fila == DLQ:
@@ -520,15 +639,21 @@ def parte_b(broker, mgmt, mgmt_ok):
                 diferencas.append(f"{fila} sem x-dead-letter-exchange={common.DLX}")
             esperado = {(common.EXCHANGE, rk) for rk in ESPERADO[fila]}
             if set(reais) != esperado:
-                diferencas.append(f"{fila}: faltando {sorted(esperado - set(reais))}, "
-                                  f"sobrando {sorted(set(reais) - esperado)}")
+                diferencas.append(
+                    f"{fila}: faltando {sorted(esperado - set(reais))}, "
+                    f"sobrando {sorted(set(reais) - esperado)}"
+                )
 
     # Bindings da exchange principal para destinos que não estão na tabela.
     origem = mgmt.get("exchanges", "{vh}", common.EXCHANGE, "bindings", "source")
     estranhos = sorted({b.get("destination") for b in origem} - set(ESPERADO))
-    evid.append(f"destinos ligados a {common.EXCHANGE}: {sorted({b.get('destination') for b in origem})}")
+    evid.append(
+        f"destinos ligados a {common.EXCHANGE}: {sorted({b.get('destination') for b in origem})}"
+    )
     if estranhos:
-        diferencas.append(f"{common.EXCHANGE} tem bindings para destinos fora da tabela: {estranhos}")
+        diferencas.append(
+            f"{common.EXCHANGE} tem bindings para destinos fora da tabela: {estranhos}"
+        )
 
     # Heartbeat negociado (importa para o risco de canal ocioso na API).
     try:
@@ -541,8 +666,12 @@ def parte_b(broker, mgmt, mgmt_ok):
     except Exception as exc:  # noqa: BLE001
         evid.append(f"heartbeat: não consegui ler ({type(exc).__name__})")
 
-    registrar("B", "Topologia no broker (exchanges, filas, DLX, bindings)", not diferencas,
-              evid + [f"DIFERENÇA: {d}" for d in diferencas])
+    registrar(
+        "B",
+        "Topologia no broker (exchanges, filas, DLX, bindings)",
+        not diferencas,
+        evid + [f"DIFERENÇA: {d}" for d in diferencas],
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -552,10 +681,40 @@ def c2_validacao(broker):
     antes = broker.contagens()
     reservas_antes = sql("SELECT COUNT(*) AS n FROM reservas")[0]["n"]
     casos = [
-        ("sem e-mail", {"evento_id": 1, "numero": 1, "nome": "Teste", "cartao": CARTAO_OK}),
-        ("cartão curto", {"evento_id": 1, "numero": 1, "nome": "Teste", "email": "a@b.com", "cartao": "4111"}),
-        ("assento inexistente", {"evento_id": 1, "numero": 999, "nome": "Teste", "email": "a@b.com", "cartao": CARTAO_OK}),
-        ("evento inexistente", {"evento_id": 99, "numero": 1, "nome": "Teste", "email": "a@b.com", "cartao": CARTAO_OK}),
+        (
+            "sem e-mail",
+            {"evento_id": 1, "numero": 1, "nome": "Teste", "cartao": CARTAO_OK},
+        ),
+        (
+            "cartão curto",
+            {
+                "evento_id": 1,
+                "numero": 1,
+                "nome": "Teste",
+                "email": "a@b.com",
+                "cartao": "4111",
+            },
+        ),
+        (
+            "assento inexistente",
+            {
+                "evento_id": 1,
+                "numero": 999,
+                "nome": "Teste",
+                "email": "a@b.com",
+                "cartao": CARTAO_OK,
+            },
+        ),
+        (
+            "evento inexistente",
+            {
+                "evento_id": 99,
+                "numero": 1,
+                "nome": "Teste",
+                "email": "a@b.com",
+                "cartao": CARTAO_OK,
+            },
+        ),
     ]
     evid, ok = [f"filas antes: {fmt_filas(antes)}"], True
     for nome, corpo in casos:
@@ -584,17 +743,37 @@ def c1_c3_resposta_imediata(broker):
         f"GET /api/reservas/{curto(rid)} -> status {st_banco}",
         f"POST #2 (publicador quente) -> HTTP {status2} em {seg2 * 1000:.0f} ms",
     ]
-    ok = (status == 202 and seg < 1.0 and st_banco == "EM_PROCESSAMENTO" and status2 == 202
-          and seg2 < 1.0 and not any(workers_conectados.values()))
+    ok = (
+        status == 202
+        and seg < 1.0
+        and st_banco == "EM_PROCESSAMENTO"
+        and status2 == 202
+        and seg2 < 1.0
+        and not any(workers_conectados.values())
+    )
     registrar("C1", "Resposta imediata com workers desligados (202 < 1 s)", ok, evid)
 
     # C3: cada reserva.criada vira uma cópia em cada fila que assina a routing key.
-    esperado = {**antes, "q.assentos": antes["q.assentos"] + 2, "q.notificacoes": antes["q.notificacoes"] + 2,
-                "q.status": antes["q.status"] + 2}
-    depois = esperar(lambda: (lambda c: c if c == esperado else None)(broker.contagens()), 10) or broker.contagens()
-    evid = [f"antes:  {fmt_filas(antes)}", f"depois: {fmt_filas(depois)}  (2 POSTs aceitos)",
-            "esperado: +2 em q.assentos, q.notificacoes, q.status; +0 em q.pagamentos, q.emissao, q.dlq"]
-    registrar("C3", "Pub/Sub: reserva.criada copiada para 3 filas", depois == esperado, evid)
+    esperado = {
+        **antes,
+        "q.assentos": antes["q.assentos"] + 2,
+        "q.notificacoes": antes["q.notificacoes"] + 2,
+        "q.status": antes["q.status"] + 2,
+    }
+    depois = (
+        esperar(
+            lambda: (lambda c: c if c == esperado else None)(broker.contagens()), 10
+        )
+        or broker.contagens()
+    )
+    evid = [
+        f"antes:  {fmt_filas(antes)}",
+        f"depois: {fmt_filas(depois)}  (2 POSTs aceitos)",
+        "esperado: +2 em q.assentos, q.notificacoes, q.status; +0 em q.pagamentos, q.emissao, q.dlq",
+    ]
+    registrar(
+        "C3", "Pub/Sub: reserva.criada copiada para 3 filas", depois == esperado, evid
+    )
 
 
 def c4_fluxo_normal(svc):
@@ -604,20 +783,38 @@ def c4_fluxo_normal(svc):
     final, historico = esperar_status(rid, FINAIS, 40)
     cid = curto(rid)
     # O log sai depois do ack; espera o último elo (notificação do ingresso) aparecer.
-    esperar(lambda: linhas_log("notificacao_service*.log", f"reserva {cid} | código"), 10)
+    esperar(
+        lambda: linhas_log("notificacao_service*.log", f"reserva {cid} | código"), 10
+    )
     cadeia = [
-        ("assentos_service*.log", f"<- reserva.criada reserva={cid}", "-> assento.reservado"),
-        ("payment_service*.log", f"<- assento.reservado reserva={cid}", "-> pagamento.aprovado"),
-        ("emissao_service*.log", f"<- pagamento.aprovado reserva={cid}", "-> ingresso.emitido"),
+        (
+            "assentos_service*.log",
+            f"<- reserva.criada reserva={cid}",
+            "-> assento.reservado",
+        ),
+        (
+            "payment_service*.log",
+            f"<- assento.reservado reserva={cid}",
+            "-> pagamento.aprovado",
+        ),
+        (
+            "emissao_service*.log",
+            f"<- pagamento.aprovado reserva={cid}",
+            "-> ingresso.emitido",
+        ),
         ("status_service*.log", f"reserva={cid}: status -> CONFIRMADA", ""),
         ("notificacao_service*.log", f"reserva {cid} | código", ""),
     ]
-    evid = [f"POST assento {numero} -> HTTP {status} em {seg * 1000:.0f} ms, reserva {cid}",
-            f"status visto pelo polling: {' -> '.join(historico)}"]
+    evid = [
+        f"POST assento {numero} -> HTTP {status} em {seg * 1000:.0f} ms, reserva {cid}",
+        f"status visto pelo polling: {' -> '.join(historico)}",
+    ]
     ok = final == "CONFIRMADA"
     for padrao, entrada, saida in cadeia:
         linhas = [l for l in linhas_log(padrao, entrada) if saida in l]
-        evid.append(linhas[0] if linhas else f"FALTOU no log {padrao}: '{entrada} ... {saida}'")
+        evid.append(
+            linhas[0] if linhas else f"FALTOU no log {padrao}: '{entrada} ... {saida}'"
+        )
         ok &= bool(linhas)
     a = assento(numero)
     ingresso = sql("SELECT codigo FROM ingressos WHERE reserva_id = ?", rid)
@@ -633,18 +830,32 @@ def c5_recusa(broker):
     status, resp, _ = reservar(numero, CARTAO_SEM_LIMITE)
     rid = resp["reserva_id"]
     final, historico = esperar_status(rid, FINAIS, 40)
-    liberado = esperar(lambda: (assento(numero) or {}).get("status") == "LIVRE"
-                       and linhas_log("assentos_service*.log", f"reserva={curto(rid)}: pagamento recusado"), 15)
+    liberado = esperar(
+        lambda: (assento(numero) or {}).get("status") == "LIVRE"
+        and linhas_log(
+            "assentos_service*.log", f"reserva={curto(rid)}: pagamento recusado"
+        ),
+        15,
+    )
     a = assento(numero)
     time.sleep(1)
     dlq_depois = broker.fila(DLQ)[0]
-    evid = [f"POST assento {numero} cartão ...0000 -> HTTP {status}, reserva {curto(rid)}",
-            f"status: {' -> '.join(historico)}",
-            *linhas_log("payment_service*.log", f"reserva={curto(rid)}"),
-            *linhas_log("assentos_service*.log", f"reserva={curto(rid)}: pagamento recusado"),
-            f"assento {numero} depois: {a}",
-            f"q.dlq: antes={dlq_antes} depois={dlq_depois}"]
-    ok = final == "PAGAMENTO_RECUSADO" and liberado and a["reserva_id"] is None and dlq_antes == dlq_depois
+    evid = [
+        f"POST assento {numero} cartão ...0000 -> HTTP {status}, reserva {curto(rid)}",
+        f"status: {' -> '.join(historico)}",
+        *linhas_log("payment_service*.log", f"reserva={curto(rid)}"),
+        *linhas_log(
+            "assentos_service*.log", f"reserva={curto(rid)}: pagamento recusado"
+        ),
+        f"assento {numero} depois: {a}",
+        f"q.dlq: antes={dlq_antes} depois={dlq_depois}",
+    ]
+    ok = (
+        final == "PAGAMENTO_RECUSADO"
+        and liberado
+        and a["reserva_id"] is None
+        and dlq_antes == dlq_depois
+    )
     registrar("C5", "Recusa de negócio: compensação e DLQ inalterada", ok, evid)
 
 
@@ -663,54 +874,92 @@ def c8_fraude(svc, broker):
 
     mensagens = broker.espiar(DLQ, lambda corpo: rid.encode() in corpo)
     dlq_pos_inspecao = broker.fila(DLQ)[0]
-    evid = [f"POST assento {numero} cartão 9999... -> HTTP {status}, reserva {cid}",
-            *nacks,
-            f"q.dlq: antes={dlq_antes} depois={dlq_depois} (após inspeção com requeue: {dlq_pos_inspecao})",
-            f"q.pagamentos: Ready={pag_ready} consumidores={pag_cons}",
-            f"payment_service vivo: {svc.vivo('payment_service')}",
-            f"status da reserva: {status_reserva(rid)} | assento {numero}: {assento(numero)}"]
+    evid = [
+        f"POST assento {numero} cartão 9999... -> HTTP {status}, reserva {cid}",
+        *nacks,
+        f"q.dlq: antes={dlq_antes} depois={dlq_depois} (após inspeção com requeue: {dlq_pos_inspecao})",
+        f"q.pagamentos: Ready={pag_ready} consumidores={pag_cons}",
+        f"payment_service vivo: {svc.vivo('payment_service')}",
+        f"status da reserva: {status_reserva(rid)} | assento {numero}: {assento(numero)}",
+    ]
     x_death_ok = False
     for m in mensagens:
         props = m["props"]
         mortes = (props.headers or {}).get("x-death") or []
         EXTRA.setdefault("props_persistentes", []).append(
-            {"fila": DLQ, "delivery_mode": props.delivery_mode, "message_id": props.message_id})
-        evid.append(f"basic_get q.dlq: routing_key={m['routing_key']} delivery_mode={props.delivery_mode} "
-                    f"content_type={props.content_type} message_id={props.message_id}")
+            {
+                "fila": DLQ,
+                "delivery_mode": props.delivery_mode,
+                "message_id": props.message_id,
+            }
+        )
+        evid.append(
+            f"basic_get q.dlq: routing_key={m['routing_key']} delivery_mode={props.delivery_mode} "
+            f"content_type={props.content_type} message_id={props.message_id}"
+        )
         for morte in mortes:
-            evid.append(f"  x-death: queue={morte.get('queue')} reason={morte.get('reason')} "
-                        f"count={morte.get('count')} exchange={morte.get('exchange')} "
-                        f"routing-keys={morte.get('routing-keys')}")
-            x_death_ok |= morte.get("queue") == "q.pagamentos" and morte.get("reason") == "rejected"
+            evid.append(
+                f"  x-death: queue={morte.get('queue')} reason={morte.get('reason')} "
+                f"count={morte.get('count')} exchange={morte.get('exchange')} "
+                f"routing-keys={morte.get('routing-keys')}"
+            )
+            x_death_ok |= (
+                morte.get("queue") == "q.pagamentos"
+                and morte.get("reason") == "rejected"
+            )
         if not mortes:
             evid.append(f"  headers: {props.headers}")
-    ok = (bool(chegou) and dlq_depois == dlq_antes + 1 and pag_ready == 0 and pag_cons == 1
-          and svc.vivo("payment_service") and len(nacks) == 1 and "NACK -> DLQ" in nacks[0]
-          and x_death_ok and dlq_pos_inspecao == dlq_depois)
+    ok = (
+        bool(chegou)
+        and dlq_depois == dlq_antes + 1
+        and pag_ready == 0
+        and pag_cons == 1
+        and svc.vivo("payment_service")
+        and len(nacks) == 1
+        and "NACK -> DLQ" in nacks[0]
+        and x_death_ok
+        and dlq_pos_inspecao == dlq_depois
+    )
     registrar("C8", "DLQ por fraude (nack requeue=False, sem loop, x-death)", ok, evid)
 
 
 def c9_payload_corrompido(svc, broker):
     dlq_antes = broker.fila(DLQ)[0]
-    r = subprocess.run([sys.executable, "-u", "workers/tools/publicar_invalido.py"], cwd=RAIZ,
-                       capture_output=True, text=True, encoding="utf-8", errors="replace",
-                       env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+    r = subprocess.run(
+        [sys.executable, "-u", "workers/tools/publicar_invalido.py"],
+        cwd=RAIZ,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+    )
     # Pub/Sub: q.assentos, q.notificacoes e q.status assinam reserva.criada, então
     # cada uma recebe uma cópia, rejeita a sua e a DLQ ganha 3 mensagens.
     esperar(lambda: broker.fila(DLQ)[0] >= dlq_antes + 3, 30)
     time.sleep(1)
     dlq_depois = broker.fila(DLQ)[0]
     invalidas = broker.espiar(DLQ, lambda corpo: b"quebrado" in corpo)
-    origens = sorted(((m["props"].headers or {}).get("x-death") or [{}])[0].get("queue", "?") for m in invalidas)
+    origens = sorted(
+        ((m["props"].headers or {}).get("x-death") or [{}])[0].get("queue", "?")
+        for m in invalidas
+    )
     vivos = {nome: svc.vivo(nome) for nome in WORKERS}
     logs = linhas_log("*_service*.log", "JSON inválido")
-    evid = [f"publicar_invalido.py exit={r.returncode}: {r.stdout.strip()}",
-            f"q.dlq: antes={dlq_antes} depois={dlq_depois} (uma cópia por fila assinante)",
-            f"x-death.queue das mensagens corrompidas na DLQ: {origens}",
-            *logs, f"workers vivos: {vivos}",
-            f"consumidores: { {f: broker.consumidores(f) for f in FILAS} }"]
-    ok = (r.returncode == 0 and dlq_depois == dlq_antes + 3 and all(vivos.values())
-          and origens == ["q.assentos", "q.notificacoes", "q.status"])
+    evid = [
+        f"publicar_invalido.py exit={r.returncode}: {r.stdout.strip()}",
+        f"q.dlq: antes={dlq_antes} depois={dlq_depois} (uma cópia por fila assinante)",
+        f"x-death.queue das mensagens corrompidas na DLQ: {origens}",
+        *logs,
+        f"workers vivos: {vivos}",
+        f"consumidores: { {f: broker.consumidores(f) for f in FILAS} }",
+    ]
+    ok = (
+        r.returncode == 0
+        and dlq_depois == dlq_antes + 3
+        and all(vivos.values())
+        and origens == ["q.assentos", "q.notificacoes", "q.status"]
+    )
     registrar("C9", "DLQ por payload corrompido, nenhum worker cai", ok, evid)
 
 
@@ -726,15 +975,31 @@ def c13_frontend():
                 return f"frontend/app.js:{i}: {texto.strip()}"
         return f"NÃO ENCONTRADO: {padrao}"
 
-    trechos = [linha("fetch(`/api/reservas/${reservaId}`)"), linha("setInterval(atualizar, 1000)"),
-               linha("rajadaEl.addEventListener"), linha('fetch("/api/reservas", {'),
-               linha("const SEM_NOVIDADE_SEGUNDOS")]
+    trechos = [
+        linha("fetch(`/api/reservas/${reservaId}`)"),
+        linha("setInterval(atualizar, 1000)"),
+        linha("rajadaEl.addEventListener"),
+        linha('fetch("/api/reservas", {'),
+        linha("const SEM_NOVIDADE_SEGUNDOS"),
+    ]
     tem_botao = 'id="rajada"' in str(corpo_index)
-    ok = (st_index == 200 and st_js == 200 and st_css == 200 and tem_botao
-          and not any(t.startswith("NÃO") for t in trechos))
-    registrar("C13", "Frontend servido pela API, com polling e botão de rajada", ok,
-              [f"GET / -> HTTP {st_index} (contém o botão id=\"rajada\": {tem_botao})",
-               f"GET /app.js -> HTTP {st_js}, GET /style.css -> HTTP {st_css}", *trechos])
+    ok = (
+        st_index == 200
+        and st_js == 200
+        and st_css == 200
+        and tem_botao
+        and not any(t.startswith("NÃO") for t in trechos)
+    )
+    registrar(
+        "C13",
+        "Frontend servido pela API, com polling e botão de rajada",
+        ok,
+        [
+            f'GET / -> HTTP {st_index} (contém o botão id="rajada": {tem_botao})',
+            f"GET /app.js -> HTTP {st_js}, GET /style.css -> HTTP {st_css}",
+            *trechos,
+        ],
+    )
 
 
 def c10_corrida(svc, broker):
@@ -745,7 +1010,9 @@ def c10_corrida(svc, broker):
 
     def disparar(i):
         barreira.wait()  # as duas threads saem juntas
-        respostas[i] = reservar(numero, nome=f"Pessoa {'AB'[i]}", email=f"pessoa{i + 1}@exemplo.com")
+        respostas[i] = reservar(
+            numero, nome=f"Pessoa {'AB'[i]}", email=f"pessoa{i + 1}@exemplo.com"
+        )
 
     threads = [threading.Thread(target=disparar, args=(i,)) for i in range(2)]
     for t in threads:
@@ -755,25 +1022,52 @@ def c10_corrida(svc, broker):
     rids = [r[1].get("reserva_id") for r in respostas if r[0] == 202]
     finais = {rid: esperar_status(rid, FINAIS, 40)[0] for rid in rids}
     a = assento(numero)
-    evid = [f"POST simultâneos para o assento {numero}: " + ", ".join(
-        f"HTTP {r[0]} em {r[2] * 1000:.0f} ms" for r in respostas)]
+    evid = [
+        f"POST simultâneos para o assento {numero}: "
+        + ", ".join(f"HTTP {r[0]} em {r[2] * 1000:.0f} ms" for r in respostas)
+    ]
     for rid, final in finais.items():
-        linhas = linhas_log("assentos_service*.log", f"<- reserva.criada reserva={curto(rid)}")
-        evid.append(f"reserva {curto(rid)} -> {final} | {linhas[0] if linhas else 'sem log'}")
-    vendidos = sql("SELECT COUNT(*) AS n FROM ingressos i JOIN reservas r ON r.id = i.reserva_id "
-                   "WHERE r.evento_id = 1 AND r.numero = ?", numero)[0]["n"]
-    pagamentos = sql("SELECT reserva_id, resultado FROM pagamentos WHERE reserva_id IN (?, ?)",
-                     *(rids + [None, None])[:2])
+        linhas = linhas_log(
+            "assentos_service*.log", f"<- reserva.criada reserva={curto(rid)}"
+        )
+        evid.append(
+            f"reserva {curto(rid)} -> {final} | {linhas[0] if linhas else 'sem log'}"
+        )
+    vendidos = sql(
+        "SELECT COUNT(*) AS n FROM ingressos i JOIN reservas r ON r.id = i.reserva_id "
+        "WHERE r.evento_id = 1 AND r.numero = ?",
+        numero,
+    )[0]["n"]
+    pagamentos = sql(
+        "SELECT reserva_id, resultado FROM pagamentos WHERE reserva_id IN (?, ?)",
+        *(rids + [None, None])[:2],
+    )
     vencedor = [rid for rid, f in finais.items() if f == "CONFIRMADA"]
-    evid += [f"assento {numero}: {a}", f"ingressos para o assento: {vendidos}",
-             f"pagamentos das 2 reservas: {pagamentos}"]
-    pids = {re.search(r"pid=(\d+)", l).group(1) for rid in rids
-            for l in linhas_log("assentos_service*.log", f"<- reserva.criada reserva={curto(rid)}")}
-    evid.append(f"pids do assentos_service que processaram: {sorted(pids)} "
-                f"(réplicas: {svc.pid_real('assentos_service', 1)}, {svc.pid_real('assentos_service', 2)})")
-    ok = (len(rids) == 2 and sorted(finais.values()) == ["ASSENTO_INDISPONIVEL", "CONFIRMADA"]
-          and len(vencedor) == 1 and a["status"] == "VENDIDO" and a["reserva_id"] == vencedor[0]
-          and vendidos == 1 and len(pagamentos) == 1)
+    evid += [
+        f"assento {numero}: {a}",
+        f"ingressos para o assento: {vendidos}",
+        f"pagamentos das 2 reservas: {pagamentos}",
+    ]
+    pids = {
+        re.search(r"pid=(\d+)", l).group(1)
+        for rid in rids
+        for l in linhas_log(
+            "assentos_service*.log", f"<- reserva.criada reserva={curto(rid)}"
+        )
+    }
+    evid.append(
+        f"pids do assentos_service que processaram: {sorted(pids)} "
+        f"(réplicas: {svc.pid_real('assentos_service', 1)}, {svc.pid_real('assentos_service', 2)})"
+    )
+    ok = (
+        len(rids) == 2
+        and sorted(finais.values()) == ["ASSENTO_INDISPONIVEL", "CONFIRMADA"]
+        and len(vencedor) == 1
+        and a["status"] == "VENDIDO"
+        and a["reserva_id"] == vencedor[0]
+        and vendidos == 1
+        and len(pagamentos) == 1
+    )
     registrar("C10", "Corrida pelo mesmo assento com 2 assentos_service", ok, evid)
     derrubar_worker(svc, broker, "assentos_service", 2)
 
@@ -785,20 +1079,38 @@ def c6_queda(svc, broker):
     for numero in assentos_livres()[:3]:
         status, resp, _ = reservar(numero)
         rids.append(resp["reserva_id"])
-    retidas = esperar(lambda: broker.fila("q.pagamentos")[0] == antes["q.pagamentos"] + 3, 30)
+    retidas = esperar(
+        lambda: broker.fila("q.pagamentos")[0] == antes["q.pagamentos"] + 3, 30
+    )
     meio = broker.fila("q.pagamentos")
     status_meio = [status_reserva(r) for r in rids]
     subir_worker(svc, broker, "payment_service", 1)
     esvaziou = esperar(lambda: broker.fila("q.pagamentos")[0] == 0, 40)
     finais = [esperar_status(r, FINAIS, 40)[0] for r in rids]
-    evid = [f"payment_service derrubado; 3 reservas: {[curto(r) for r in rids]}",
-            f"q.pagamentos com o serviço caído: Ready={meio[0]} consumidores={meio[1]}",
-            f"status com o serviço caído: {status_meio}",
-            f"depois de religar: q.pagamentos Ready={broker.fila('q.pagamentos')[0]}",
-            f"status finais: {finais}",
-            *[l for r in rids for l in linhas_log("payment_service*.log", f"reserva={curto(r)}")]]
-    ok = bool(retidas) and meio[0] == 3 and bool(esvaziou) and finais == ["CONFIRMADA"] * 3
-    registrar("C6", "Queda do payment_service: mensagens retidas e processadas ao religar", ok, evid)
+    evid = [
+        f"payment_service derrubado; 3 reservas: {[curto(r) for r in rids]}",
+        f"q.pagamentos com o serviço caído: Ready={meio[0]} consumidores={meio[1]}",
+        f"status com o serviço caído: {status_meio}",
+        f"depois de religar: q.pagamentos Ready={broker.fila('q.pagamentos')[0]}",
+        f"status finais: {finais}",
+        *[
+            l
+            for r in rids
+            for l in linhas_log("payment_service*.log", f"reserva={curto(r)}")
+        ],
+    ]
+    ok = (
+        bool(retidas)
+        and meio[0] == 3
+        and bool(esvaziou)
+        and finais == ["CONFIRMADA"] * 3
+    )
+    registrar(
+        "C6",
+        "Queda do payment_service: mensagens retidas e processadas ao religar",
+        ok,
+        evid,
+    )
 
 
 def c7_ack_manual(svc, broker, mgmt, mgmt_ok):
@@ -810,8 +1122,11 @@ def c7_ack_manual(svc, broker, mgmt, mgmt_ok):
     rid = resp["reserva_id"]
     cid = curto(rid)
     # AGUARDANDO_PAGAMENTO + Ready=0 em q.pagamentos = a mensagem está com o worker, sem ack.
-    entregue = esperar(lambda: status_reserva(rid) == "AGUARDANDO_PAGAMENTO"
-                       and broker.fila("q.pagamentos")[0] == 0, 20)
+    entregue = esperar(
+        lambda: status_reserva(rid) == "AGUARDANDO_PAGAMENTO"
+        and broker.fila("q.pagamentos")[0] == 0,
+        20,
+    )
     unacked = None
     if mgmt_ok:
         try:
@@ -824,22 +1139,43 @@ def c7_ack_manual(svc, broker, mgmt, mgmt_ok):
     derrubar_worker(svc, broker, "payment_service", 1)
     voltou = esperar(lambda: broker.fila("q.pagamentos")[0] == 1, 20)
     ready_pos_queda = broker.fila("q.pagamentos")[0]
-    cobrancas_pos_queda = sql("SELECT COUNT(*) AS n FROM pagamentos WHERE reserva_id = ?", rid)[0]["n"]
+    cobrancas_pos_queda = sql(
+        "SELECT COUNT(*) AS n FROM pagamentos WHERE reserva_id = ?", rid
+    )[0]["n"]
     subir_worker(svc, broker, "payment_service", 1)
     final, _ = esperar_status(rid, FINAIS, 40)
-    cobrancas = sql("SELECT COUNT(*) AS n FROM pagamentos WHERE reserva_id = ?", rid)[0]["n"]
-    ingressos = sql("SELECT COUNT(*) AS n FROM ingressos WHERE reserva_id = ?", rid)[0]["n"]
+    cobrancas = sql("SELECT COUNT(*) AS n FROM pagamentos WHERE reserva_id = ?", rid)[
+        0
+    ]["n"]
+    ingressos = sql("SELECT COUNT(*) AS n FROM ingressos WHERE reserva_id = ?", rid)[0][
+        "n"
+    ]
     logs = linhas_log("payment_service*.log", f"reserva={cid}")
-    evid = [f"reserva {cid} entregue ao payment_service pid={pid_morto} (PAYMENT_DELAY=8): {bool(entregue)}, "
-            f"unacked no painel: {unacked}",
-            f"kill no meio do pagamento -> q.pagamentos Ready={ready_pos_queda} (mensagem voltou)",
-            f"pagamentos gravados logo após a queda: {cobrancas_pos_queda}",
-            f"depois de religar (pid={svc.pid_real('payment_service', 1)}): status={final}, "
-            f"pagamentos={cobrancas}, ingressos={ingressos}",
-            *logs]
-    ok = (bool(entregue) and bool(voltou) and cobrancas_pos_queda == 0 and final == "CONFIRMADA"
-          and cobrancas == 1 and ingressos == 1 and len(logs) == 1 and pid_morto not in logs[0])
-    registrar("C7", "Ack manual: worker morto no meio, mensagem reentregue e processada 1 vez", ok, evid)
+    evid = [
+        f"reserva {cid} entregue ao payment_service pid={pid_morto} (PAYMENT_DELAY=8): {bool(entregue)}, "
+        f"unacked no painel: {unacked}",
+        f"kill no meio do pagamento -> q.pagamentos Ready={ready_pos_queda} (mensagem voltou)",
+        f"pagamentos gravados logo após a queda: {cobrancas_pos_queda}",
+        f"depois de religar (pid={svc.pid_real('payment_service', 1)}): status={final}, "
+        f"pagamentos={cobrancas}, ingressos={ingressos}",
+        *logs,
+    ]
+    ok = (
+        bool(entregue)
+        and bool(voltou)
+        and cobrancas_pos_queda == 0
+        and final == "CONFIRMADA"
+        and cobrancas == 1
+        and ingressos == 1
+        and len(logs) == 1
+        and pid_morto not in logs[0]
+    )
+    registrar(
+        "C7",
+        "Ack manual: worker morto no meio, mensagem reentregue e processada 1 vez",
+        ok,
+        evid,
+    )
 
 
 def c11_competing_consumers(svc, broker):
@@ -854,9 +1190,13 @@ def c11_competing_consumers(svc, broker):
 
     def disparar(i, numero):
         barreira.wait()
-        respostas[i] = reservar(numero, CARTAO_OK, f"Rajada {i + 1}", f"rajada{i + 1}@exemplo.com")
+        respostas[i] = reservar(
+            numero, CARTAO_OK, f"Rajada {i + 1}", f"rajada{i + 1}@exemplo.com"
+        )
 
-    threads = [threading.Thread(target=disparar, args=(i, n)) for i, n in enumerate(livres)]
+    threads = [
+        threading.Thread(target=disparar, args=(i, n)) for i, n in enumerate(livres)
+    ]
     t0 = time.perf_counter()
     for t in threads:
         t.start()
@@ -865,23 +1205,45 @@ def c11_competing_consumers(svc, broker):
     envio = time.perf_counter() - t0
     rids = [r[1]["reserva_id"] for r in respostas if r[0] == 202]
     finais = [esperar_status(r, FINAIS, 60)[0] for r in rids]
-    esperar(lambda: all(linhas_log("payment_service*.log", f"reserva={curto(r)}") for r in rids), 10)
+    esperar(
+        lambda: all(
+            linhas_log("payment_service*.log", f"reserva={curto(r)}") for r in rids
+        ),
+        10,
+    )
     por_pid = {}
     for r in rids:
-        for linha in linhas_log("payment_service*.log", f"<- assento.reservado reserva={curto(r)}"):
+        for linha in linhas_log(
+            "payment_service*.log", f"<- assento.reservado reserva={curto(r)}"
+        ):
             pid = re.search(r"pid=(\d+)", linha).group(1)
             por_pid[pid] = por_pid.get(pid, 0) + 1
     tempos = sorted(r[2] for r in respostas)
-    evid = [f"réplicas do payment_service: {sorted(pids)} (consumidores em q.pagamentos: "
-            f"{broker.consumidores('q.pagamentos')})",
-            f"rajada: {len(livres)} POSTs simultâneos, {len(rids)} HTTP 202, enviados em {envio:.2f} s "
-            f"(resposta: mín {tempos[0] * 1000:.0f} ms, máx {tempos[-1] * 1000:.0f} ms)",
-            f"status finais: { {s: finais.count(s) for s in set(finais)} }",
-            f"mensagens processadas por pid: {por_pid}"]
-    evid += [l for r in rids for l in linhas_log("payment_service*.log", f"<- assento.reservado reserva={curto(r)}")]
-    ok = (len(rids) == 10 and all(f in FINAIS for f in finais) and len(por_pid) == 2
-          and set(por_pid) == pids and sum(por_pid.values()) == 10)
-    registrar("C11", "Competing consumers: rajada de 10 dividida entre 2 réplicas", ok, evid)
+    evid = [
+        f"réplicas do payment_service: {sorted(pids)} (consumidores em q.pagamentos: "
+        f"{broker.consumidores('q.pagamentos')})",
+        f"rajada: {len(livres)} POSTs simultâneos, {len(rids)} HTTP 202, enviados em {envio:.2f} s "
+        f"(resposta: mín {tempos[0] * 1000:.0f} ms, máx {tempos[-1] * 1000:.0f} ms)",
+        f"status finais: { {s: finais.count(s) for s in set(finais)} }",
+        f"mensagens processadas por pid: {por_pid}",
+    ]
+    evid += [
+        l
+        for r in rids
+        for l in linhas_log(
+            "payment_service*.log", f"<- assento.reservado reserva={curto(r)}"
+        )
+    ]
+    ok = (
+        len(rids) == 10
+        and all(f in FINAIS for f in finais)
+        and len(por_pid) == 2
+        and set(por_pid) == pids
+        and sum(por_pid.values()) == 10
+    )
+    registrar(
+        "C11", "Competing consumers: rajada de 10 dividida entre 2 réplicas", ok, evid
+    )
 
 
 def c12_idempotencia(svc, broker):
@@ -895,33 +1257,60 @@ def c12_idempotencia(svc, broker):
     codigo_antes = sql("SELECT codigo FROM ingressos WHERE reserva_id = ?", rid)
 
     # Mesmo envelope (mesmo event_id/message_id) publicado 2x, como numa reentrega.
-    envelope = common.build_envelope("assento.reservado", rid, {
-        "evento_id": 1, "numero": numero, "valor_centavos": 8000,
-        "nome": "Teste E2E", "email": "e2e@exemplo.com", "cartao": CARTAO_OK,
-    })
+    envelope = common.build_envelope(
+        "assento.reservado",
+        rid,
+        {
+            "evento_id": 1,
+            "numero": numero,
+            "valor_centavos": 8000,
+            "nome": "Teste E2E",
+            "email": "e2e@exemplo.com",
+            "cartao": CARTAO_OK,
+        },
+    )
     corpo = json.dumps(envelope).encode("utf-8")
-    props = pika.BasicProperties(delivery_mode=pika.DeliveryMode.Persistent, content_type="application/json",
-                                 message_id=envelope["event_id"], type="assento.reservado")
+    props = pika.BasicProperties(
+        delivery_mode=pika.DeliveryMode.Persistent,
+        content_type="application/json",
+        message_id=envelope["event_id"],
+        type="assento.reservado",
+    )
     broker.publicar_bruto("assento.reservado", corpo, props)
     broker.publicar_bruto("assento.reservado", corpo, props)
     # 1 processamento original + 2 duplicatas, em pagamento e em emissão.
-    esperar(lambda: len(linhas_log("payment_service*.log", f"reserva={cid}")) >= 3
-            and len(linhas_log("emissao_service*.log", f"reserva={cid}")) >= 3, 40)
+    esperar(
+        lambda: len(linhas_log("payment_service*.log", f"reserva={cid}")) >= 3
+        and len(linhas_log("emissao_service*.log", f"reserva={cid}")) >= 3,
+        40,
+    )
     time.sleep(1)
     pagamentos = sql("SELECT resultado FROM pagamentos WHERE reserva_id = ?", rid)
     ingressos = sql("SELECT codigo FROM ingressos WHERE reserva_id = ?", rid)
     dlq_depois = broker.fila(DLQ)[0]
-    evid = [f"reserva {cid} -> {final}; ingresso antes da duplicata: {codigo_antes}",
-            f"envelope assento.reservado event_id={curto(envelope['event_id'])} publicado 2x",
-            *linhas_log("payment_service*.log", f"reserva={cid}"),
-            *linhas_log("emissao_service*.log", f"reserva={cid}"),
-            *linhas_log("assentos_service*.log", f"reserva={cid}: assento já"),
-            f"linhas em pagamentos: {len(pagamentos)} | linhas em ingressos: {len(ingressos)} {ingressos}",
-            f"status final: {status_reserva(rid)} | q.dlq antes={dlq_antes} depois={dlq_depois}"]
-    ok = (final == "CONFIRMADA" and len(pagamentos) == 1 and len(ingressos) == 1
-          and ingressos == codigo_antes and dlq_antes == dlq_depois
-          and len(linhas_log("payment_service*.log", f"reserva={cid}")) == 3)
-    registrar("C12", "Idempotência: assento.reservado duplicado não cobra nem emite de novo", ok, evid)
+    evid = [
+        f"reserva {cid} -> {final}; ingresso antes da duplicata: {codigo_antes}",
+        f"envelope assento.reservado event_id={curto(envelope['event_id'])} publicado 2x",
+        *linhas_log("payment_service*.log", f"reserva={cid}"),
+        *linhas_log("emissao_service*.log", f"reserva={cid}"),
+        *linhas_log("assentos_service*.log", f"reserva={cid}: assento já"),
+        f"linhas em pagamentos: {len(pagamentos)} | linhas em ingressos: {len(ingressos)} {ingressos}",
+        f"status final: {status_reserva(rid)} | q.dlq antes={dlq_antes} depois={dlq_depois}",
+    ]
+    ok = (
+        final == "CONFIRMADA"
+        and len(pagamentos) == 1
+        and len(ingressos) == 1
+        and ingressos == codigo_antes
+        and dlq_antes == dlq_depois
+        and len(linhas_log("payment_service*.log", f"reserva={cid}")) == 3
+    )
+    registrar(
+        "C12",
+        "Idempotência: assento.reservado duplicado não cobra nem emite de novo",
+        ok,
+        evid,
+    )
 
 
 def durabilidade(mgmt_ok):
@@ -930,25 +1319,44 @@ def durabilidade(mgmt_ok):
     for fila, d in filas.items():
         evid.append(f"{fila}: durable={d['durable']}")
     for p in EXTRA.get("props_persistentes", []):
-        evid.append(f"mensagem lida da {p['fila']} com basic_get: delivery_mode={p['delivery_mode']} "
-                    f"message_id={p['message_id']}")
-    evid.append("sem restart do broker (plano gratuito do CloudAMQP): verificado por propriedades")
-    ok = (mgmt_ok and filas and all(d["durable"] for d in filas.values())
-          and EXTRA.get("props_persistentes") and all(p["delivery_mode"] == 2 for p in EXTRA["props_persistentes"]))
-    registrar("DUR", "Durabilidade (filas durable + delivery_mode=2), sem restart", ok, evid)
+        evid.append(
+            f"mensagem lida da {p['fila']} com basic_get: delivery_mode={p['delivery_mode']} "
+            f"message_id={p['message_id']}"
+        )
+    evid.append(
+        "sem restart do broker (plano gratuito do CloudAMQP): verificado por propriedades"
+    )
+    ok = (
+        mgmt_ok
+        and filas
+        and all(d["durable"] for d in filas.values())
+        and EXTRA.get("props_persistentes")
+        and all(p["delivery_mode"] == 2 for p in EXTRA["props_persistentes"])
+    )
+    registrar(
+        "DUR", "Durabilidade (filas durable + delivery_mode=2), sem restart", ok, evid
+    )
 
 
 def idle_api(segundos):
-    info(f"deixando a API ociosa por {segundos} s (heartbeat negociado: {EXTRA.get('heartbeat')} s)...")
+    info(
+        f"deixando a API ociosa por {segundos} s (heartbeat negociado: {EXTRA.get('heartbeat')} s)..."
+    )
     time.sleep(segundos)
     numero = assentos_livres()[0]
     status, resp, seg = reservar(numero)
     rid = resp.get("reserva_id") if isinstance(resp, dict) else None
     final = esperar_status(rid, FINAIS, 40)[0] if rid else None
     # O log da API diz se a conexão do publicador tinha caído e foi reaberta.
-    registrar("IDLE", f"API publica depois de {segundos} s ociosa (reconexão)", status == 202 and final == "CONFIRMADA",
-              [f"POST após {segundos} s sem publicar -> HTTP {status} em {seg * 1000:.0f} ms, status final {final}",
-               *linhas_log("api.log", "] publica")])  # "publicador ..." e "publicação falhou ..."
+    registrar(
+        "IDLE",
+        f"API publica depois de {segundos} s ociosa (reconexão)",
+        status == 202 and final == "CONFIRMADA",
+        [
+            f"POST após {segundos} s sem publicar -> HTTP {status} em {seg * 1000:.0f} ms, status final {final}",
+            *linhas_log("api.log", "] publica"),
+        ],
+    )  # "publicador ..." e "publicação falhou ..."
 
 
 # --------------------------------------------------------------------------- #
@@ -960,21 +1368,47 @@ def executar(nome, funcao, *args):
     try:
         funcao(*args)
     except Exception as exc:  # noqa: BLE001
-        registrar(nome, "erro ao executar o teste", False,
-                  [f"{type(exc).__name__}: {exc}", *traceback.format_exc().splitlines()[-6:]])
+        registrar(
+            nome,
+            "erro ao executar o teste",
+            False,
+            [f"{type(exc).__name__}: {exc}", *traceback.format_exc().splitlines()[-6:]],
+        )
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Verificação de ponta a ponta (purga filas e reseta o banco).")
-    parser.add_argument("--sim", action="store_true", help="confirma que pode purgar as filas e resetar o banco")
-    parser.add_argument("--idle", type=int, default=0, help="segundos de API ociosa antes do teste IDLE (0 = pula)")
-    parser.add_argument("--manter-filas", action="store_true", help="não purga as filas no final")
-    parser.add_argument("--sem-backup", action="store_true", help="não salva as mensagens antes do 1º purge")
+    parser = argparse.ArgumentParser(
+        description="Verificação de ponta a ponta (purga filas e reseta o banco)."
+    )
+    parser.add_argument(
+        "--sim",
+        action="store_true",
+        help="confirma que pode purgar as filas e resetar o banco",
+    )
+    parser.add_argument(
+        "--idle",
+        type=int,
+        default=0,
+        help="segundos de API ociosa antes do teste IDLE (0 = pula)",
+    )
+    parser.add_argument(
+        "--manter-filas", action="store_true", help="não purga as filas no final"
+    )
+    parser.add_argument(
+        "--sem-backup",
+        action="store_true",
+        help="não salva as mensagens antes do 1º purge",
+    )
     args = parser.parse_args()
 
-    print("ATENÇÃO: este teste PURGA todas as filas do broker do .env e RESETA o banco SQLite.")
+    print(
+        "ATENÇÃO: este teste PURGA todas as filas do broker do .env e RESETA o banco SQLite."
+    )
     if not args.sim:
-        if not sys.stdin.isatty() or input("Digite SIM para continuar: ").strip().upper() != "SIM":
+        if (
+            not sys.stdin.isatty()
+            or input("Digite SIM para continuar: ").strip().upper() != "SIM"
+        ):
             sys.exit("Cancelado. Use --sim para confirmar.")
     if not common.AMQP_URL:
         sys.exit("AMQP_URL não definida no .env.")
@@ -989,7 +1423,9 @@ def main():
     try:
         ocupadas = {f: broker.consumidores(f) for f in FILAS_TODAS}
         if any(ocupadas.values()):
-            sys.exit(f"PARE: há consumidores conectados ({ocupadas}). Alguém está usando o broker.")
+            sys.exit(
+                f"PARE: há consumidores conectados ({ocupadas}). Alguém está usando o broker."
+            )
 
         parte_a()
 
@@ -1044,15 +1480,26 @@ def main():
         broker.fechar()
 
         (LOGS / "e2e_resultado.json").write_text(
-            json.dumps({"quando": datetime.now().isoformat(timespec="seconds"), "resultados": RESULTADOS,
-                        "extra": {k: v for k, v in EXTRA.items() if k != "mgmt_filas"}},
-                       ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+            json.dumps(
+                {
+                    "quando": datetime.now().isoformat(timespec="seconds"),
+                    "resultados": RESULTADOS,
+                    "extra": {k: v for k, v in EXTRA.items() if k != "mgmt_filas"},
+                },
+                ensure_ascii=False,
+                indent=2,
+                default=str,
+            ),
+            encoding="utf-8",
+        )
 
         print("\n================ RESUMO ================")
         for r in RESULTADOS:
             print(f"{'PASS' if r['ok'] else 'FAIL'}  {r['id']:<6} {r['titulo']}")
         aprovados = sum(r["ok"] for r in RESULTADOS)
-        print(f"\n{aprovados}/{len(RESULTADOS)} PASS  (detalhes em logs/e2e_resultado.json)")
+        print(
+            f"\n{aprovados}/{len(RESULTADOS)} PASS  (detalhes em logs/e2e_resultado.json)"
+        )
 
 
 if __name__ == "__main__":

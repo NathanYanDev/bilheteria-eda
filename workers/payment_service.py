@@ -44,7 +44,7 @@ def _validar(envelope):
 
 
 # --------------------------------------------------------------------------- #
-# Regras do cartão fictício (tabela do CLAUDE.md)
+# Regras do cartão fictício
 # --------------------------------------------------------------------------- #
 def _decidir(cartao):
     # Fraude é ERRO, não recusa: a mensagem vai para a DLQ para alguém analisar.
@@ -121,7 +121,12 @@ def processar(channel, envelope):
         publish_event(channel, "pagamento.aprovado", reserva_id, dados)
         return "pagamento.aprovado"
 
-    publish_event(channel, "pagamento.recusado", reserva_id, {**dados, "motivo": "cartão sem limite"})
+    publish_event(
+        channel,
+        "pagamento.recusado",
+        reserva_id,
+        {**dados, "motivo": "cartão sem limite"},
+    )
     return "pagamento.recusado"
 
 

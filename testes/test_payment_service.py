@@ -17,7 +17,9 @@ from pathlib import Path
 from unittest import mock
 
 # Banco temporário (nunca o data/bilheteria.db). Os processos filhos herdam o caminho.
-os.environ.setdefault("DB_PATH", str(Path(tempfile.mkdtemp(prefix="bilheteria_teste_")) / "teste.db"))
+os.environ.setdefault(
+    "DB_PATH", str(Path(tempfile.mkdtemp(prefix="bilheteria_teste_")) / "teste.db")
+)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "workers"))
 
 import pika  # noqa: E402
@@ -50,16 +52,30 @@ def criar_reserva(evento_id=1, numero=1, cartao=CARTAO_OK):
 
 
 def assento_reservado(reserva_id, cartao=CARTAO_OK, evento_id=1, numero=1, **extra):
-    payload = {"evento_id": evento_id, "numero": numero, "nome": "Bruno Lima",
-               "email": "bruno@exemplo.com", "cartao": cartao, "valor_centavos": 8000, **extra}
-    return {"event_id": str(uuid.uuid4()), "event_type": "assento.reservado",
-            "reserva_id": reserva_id, "payload": payload}
+    payload = {
+        "evento_id": evento_id,
+        "numero": numero,
+        "nome": "Bruno Lima",
+        "email": "bruno@exemplo.com",
+        "cartao": cartao,
+        "valor_centavos": 8000,
+        **extra,
+    }
+    return {
+        "event_id": str(uuid.uuid4()),
+        "event_type": "assento.reservado",
+        "reserva_id": reserva_id,
+        "payload": payload,
+    }
 
 
 def pagamentos_gravados():
     conn = db.connect()
     try:
-        return [tuple(r) for r in conn.execute("SELECT reserva_id, resultado FROM pagamentos")]
+        return [
+            tuple(r)
+            for r in conn.execute("SELECT reserva_id, resultado FROM pagamentos")
+        ]
     finally:
         conn.close()
 
@@ -67,8 +83,10 @@ def pagamentos_gravados():
 def assento(evento_id, numero):
     conn = db.connect()
     try:
-        row = conn.execute("SELECT status, reserva_id FROM assentos WHERE evento_id = ? AND numero = ?",
-                           (evento_id, numero)).fetchone()
+        row = conn.execute(
+            "SELECT status, reserva_id FROM assentos WHERE evento_id = ? AND numero = ?",
+            (evento_id, numero),
+        ).fetchone()
     finally:
         conn.close()
     return (row["status"], row["reserva_id"])
@@ -78,8 +96,9 @@ def assento(evento_id, numero):
 def _pagar_em_outro_processo(args):
     reserva_id, cartao, atraso = args
     publicados = []
-    with mock.patch.object(svc, "PAYMENT_DELAY", atraso), \
-            mock.patch.object(svc, "publish_event", lambda ch, tipo, rid, p: publicados.append(tipo)):
+    with mock.patch.object(svc, "PAYMENT_DELAY", atraso), mock.patch.object(
+        svc, "publish_event", lambda ch, tipo, rid, p: publicados.append(tipo)
+    ):
         svc.processar(None, assento_reservado(reserva_id, cartao))
     return os.getpid(), publicados[0]
 
@@ -90,9 +109,13 @@ class BasePagamento(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             db.reset()
         self.publicados = []
-        fake = lambda ch, tipo, rid, payload: self.publicados.append((tipo, rid, payload))
-        for alvo, valor in ((svc, ("publish_event", fake)),
-                            (svc, ("PAYMENT_DELAY", 0))):
+        fake = lambda ch, tipo, rid, payload: self.publicados.append(
+            (tipo, rid, payload)
+        )
+        for alvo, valor in (
+            (svc, ("publish_event", fake)),
+            (svc, ("PAYMENT_DELAY", 0)),
+        ):
             patcher = mock.patch.object(alvo, *valor)
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -135,12 +158,23 @@ class TestRegrasDoCartao(BasePagamento):
     def test_9999_no_meio_ou_no_fim_nao_e_fraude(self):
         for cartao in ("4111999911111111", "4111111111119999"):
             with self.subTest(cartao=cartao):
-                self.assertEqual(self.pagar(criar_reserva(cartao=cartao), cartao), "pagamento.aprovado")
+                self.assertEqual(
+                    self.pagar(criar_reserva(cartao=cartao), cartao),
+                    "pagamento.aprovado",
+                )
 
     def test_0000_no_inicio_no_meio_ou_incompleto_nao_e_recusa(self):
-        for cartao in ("0000111111111111", "4111000011111111", "4111111111111000", "4111111111110001"):
+        for cartao in (
+            "0000111111111111",
+            "4111000011111111",
+            "4111111111111000",
+            "4111111111110001",
+        ):
             with self.subTest(cartao=cartao):
-                self.assertEqual(self.pagar(criar_reserva(cartao=cartao), cartao), "pagamento.aprovado")
+                self.assertEqual(
+                    self.pagar(criar_reserva(cartao=cartao), cartao),
+                    "pagamento.aprovado",
+                )
 
     def test_atraso_artificial_e_aplicado(self):
         with mock.patch.object(svc, "PAYMENT_DELAY", 2):
@@ -197,7 +231,9 @@ class TestNaoCobraDuasVezes(BasePagamento):
 
     def test_falha_no_publish_depois_de_gravar_e_recuperada_na_reentrega(self):
         r = criar_reserva()
-        with mock.patch.object(svc, "publish_event", side_effect=pika.exceptions.AMQPConnectionError()):
+        with mock.patch.object(
+            svc, "publish_event", side_effect=pika.exceptions.AMQPConnectionError()
+        ):
             with self.assertRaises(pika.exceptions.AMQPError):
                 self.pagar(r)
         self.assertEqual(pagamentos_gravados(), [(r, "APROVADO")])
@@ -218,8 +254,16 @@ class TestPayloadInvalido(BasePagamento):
 
     def test_cartao_invalido(self):
         r = criar_reserva()
-        for cartao in (None, "", "411111111111111", "41111111111111111", "4111 1111 1111 1111",
-                       "4111a11111111111", 4111111111111111, ["4111111111111111"]):
+        for cartao in (
+            None,
+            "",
+            "411111111111111",
+            "41111111111111111",
+            "4111 1111 1111 1111",
+            "4111a11111111111",
+            4111111111111111,
+            ["4111111111111111"],
+        ):
             with self.subTest(cartao=cartao):
                 self.assertVaiParaDLQ(assento_reservado(r, cartao))
 
@@ -267,7 +311,10 @@ class TestEventoPublicado(BasePagamento):
         self.pagar(r, numero=20, email="hacker@exemplo.com")
         tipo, rid, payload = self.publicados[0]
         self.assertEqual((tipo, rid), ("pagamento.aprovado", r))
-        self.assertEqual((payload["evento_id"], payload["numero"], payload["email"]), (1, 3, "bruno@exemplo.com"))
+        self.assertEqual(
+            (payload["evento_id"], payload["numero"], payload["email"]),
+            (1, 3, "bruno@exemplo.com"),
+        )
 
     def test_valor_segue_para_os_proximos_servicos(self):
         self.pagar(criar_reserva())
@@ -277,8 +324,16 @@ class TestEventoPublicado(BasePagamento):
 class TestLeituraDoAtraso(unittest.TestCase):
 
     def test_payment_delay_invalido_ou_negativo(self):
-        for valor, esperado in (("3", 3.0), ("0.5", 0.5), ("abc", 2.0), ("-5", 0.0), ("", 2.0)):
-            with self.subTest(valor=valor), mock.patch.dict(os.environ, {"PAYMENT_DELAY": valor}):
+        for valor, esperado in (
+            ("3", 3.0),
+            ("0.5", 0.5),
+            ("abc", 2.0),
+            ("-5", 0.0),
+            ("", 2.0),
+        ):
+            with self.subTest(valor=valor), mock.patch.dict(
+                os.environ, {"PAYMENT_DELAY": valor}
+            ):
                 self.assertEqual(svc._ler_atraso(), esperado)
 
 
@@ -293,7 +348,12 @@ class BrokerDeMentira:
         self.historico = []
 
     def publicar(self, channel, tipo, reserva_id, payload):
-        env = {"event_id": str(uuid.uuid4()), "event_type": tipo, "reserva_id": reserva_id, "payload": payload}
+        env = {
+            "event_id": str(uuid.uuid4()),
+            "event_type": tipo,
+            "reserva_id": reserva_id,
+            "payload": payload,
+        }
         self.fila.append(env)
         self.historico.append((tipo, reserva_id))
 
@@ -316,13 +376,25 @@ class TestFluxoCompleto(BasePagamento):
         super().setUp()
         self.broker = BrokerDeMentira()
         mock.patch.object(svc, "publish_event", self.broker.publicar).start()
-        mock.patch.object(assentos_service, "publish_event", self.broker.publicar).start()
+        mock.patch.object(
+            assentos_service, "publish_event", self.broker.publicar
+        ).start()
         mock.patch.object(assentos_service, "log").start()
 
     def comprar(self, numero, cartao, nome="Cliente"):
         r = criar_reserva(1, numero, cartao)
-        self.broker.publicar(None, "reserva.criada", r, {
-            "evento_id": 1, "numero": numero, "nome": nome, "email": "c@exemplo.com", "cartao": cartao})
+        self.broker.publicar(
+            None,
+            "reserva.criada",
+            r,
+            {
+                "evento_id": 1,
+                "numero": numero,
+                "nome": nome,
+                "email": "c@exemplo.com",
+                "cartao": cartao,
+            },
+        )
         return r
 
     def test_compra_aprovada_termina_com_assento_vendido(self):
@@ -344,7 +416,11 @@ class TestFluxoCompleto(BasePagamento):
         b = self.comprar(5, CARTAO_OK, "Bruno")
         self.broker.rodar()
         self.assertEqual(assento(1, 5), ("VENDIDO", a))
-        self.assertEqual(pagamentos_gravados(), [(a, "APROVADO")], "quem perdeu o assento não pode ser cobrado")
+        self.assertEqual(
+            pagamentos_gravados(),
+            [(a, "APROVADO")],
+            "quem perdeu o assento não pode ser cobrado",
+        )
         self.assertIn(("assento.indisponivel", b), self.broker.historico)
 
     def test_primeiro_recusado_segundo_perdeu_antes_e_assento_fica_livre(self):
@@ -357,7 +433,6 @@ class TestFluxoCompleto(BasePagamento):
         self.assertIn(("assento.indisponivel", b), self.broker.historico)
 
     def test_fraude_deixa_assento_bloqueado_e_nada_e_cobrado(self):
-        # Comportamento definido no CLAUDE.md: fraude vai para a DLQ e para ali.
         r = self.comprar(5, CARTAO_FRAUDE)
         with self.assertRaises(common.ErroProcessamento):
             self.broker.rodar()
@@ -383,8 +458,12 @@ class TestReplicas(BasePagamento):
         # réplica ainda "cobrava". As duas passam pela checagem antes de gravar.
         r = criar_reserva()
         with mp.Pool(2) as pool:
-            resultados = pool.map(_pagar_em_outro_processo, [(r, CARTAO_OK, 0.5)] * 2, chunksize=1)
-        self.assertEqual(len({pid for pid, _ in resultados}), 2, "não rodou em 2 processos")
+            resultados = pool.map(
+                _pagar_em_outro_processo, [(r, CARTAO_OK, 0.5)] * 2, chunksize=1
+            )
+        self.assertEqual(
+            len({pid for pid, _ in resultados}), 2, "não rodou em 2 processos"
+        )
         self.assertEqual([tipo for _, tipo in resultados], ["pagamento.aprovado"] * 2)
         self.assertEqual(pagamentos_gravados(), [(r, "APROVADO")])
 
@@ -392,8 +471,11 @@ class TestReplicas(BasePagamento):
         cartoes = [CARTAO_OK, CARTAO_SEM_LIMITE] * 5
         reservas = [criar_reserva(1, n, c) for n, c in enumerate(cartoes, start=1)]
         with mp.Pool(2) as pool:
-            resultados = pool.map(_pagar_em_outro_processo,
-                                  [(r, c, 0.05) for r, c in zip(reservas, cartoes)], chunksize=1)
+            resultados = pool.map(
+                _pagar_em_outro_processo,
+                [(r, c, 0.05) for r, c in zip(reservas, cartoes)],
+                chunksize=1,
+            )
         gravados = dict(pagamentos_gravados())
         self.assertEqual(len(gravados), 10)
         for (pid, tipo), r, cartao in zip(resultados, reservas, cartoes):

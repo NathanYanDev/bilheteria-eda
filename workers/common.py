@@ -29,7 +29,7 @@ AMQP_URL = os.getenv("AMQP_URL", "").strip()
 
 # Nomes das exchanges (usados também pelo setup_broker.py).
 EXCHANGE = "ingressos.events"  # topic: roteia pelo event_type (routing key)
-DLX = "ingressos.dlx"          # fanout: recebe tudo que for rejeitado (nack requeue=False)
+DLX = "ingressos.dlx"  # fanout: recebe tudo que for rejeitado (nack requeue=False)
 
 # Tempo de espera antes de tentar reconectar quando a conexão cai.
 RECONNECT_DELAY = 5
@@ -63,7 +63,9 @@ def get_connection(name=None):
     ver quantas réplicas de cada serviço estão conectadas.
     """
     if not AMQP_URL:
-        sys.exit("AMQP_URL não definida. Copie .env.example para .env e preencha a URL do CloudAMQP.")
+        sys.exit(
+            "AMQP_URL não definida. Copie .env.example para .env e preencha a URL do CloudAMQP."
+        )
 
     params = pika.URLParameters(AMQP_URL)
     if name:
@@ -75,7 +77,7 @@ def get_connection(name=None):
 # Publicação
 # --------------------------------------------------------------------------- #
 def build_envelope(event_type, reserva_id, payload):
-    """Monta o envelope padrão (ver CLAUDE.md). event_type == routing key."""
+    """Monta o envelope padrão. event_type == routing key."""
     return {
         "event_id": str(uuid.uuid4()),
         "event_type": event_type,
@@ -193,7 +195,10 @@ def run_consumer(service, queue, callback):
             # Banco ocupado/indisponível agora: erro temporário, não permanente.
             # Mandar para a DLQ perderia uma reserva válida. Sobe para o loop de
             # reconexão, que fecha a conexão sem ack -> o broker reentrega.
-            log(service, f"{entrada}  |  ERRO temporário no banco: {exc}  |  sem ack, será reentregue")
+            log(
+                service,
+                f"{entrada}  |  ERRO temporário no banco: {exc}  |  sem ack, será reentregue",
+            )
             raise
         except Exception as exc:  # bug ou erro inesperado
             # Também vai para a DLQ: devolver para a fila poderia gerar um loop
@@ -215,7 +220,9 @@ def run_consumer(service, queue, callback):
             channel = connection.channel()
             channel.confirm_delivery()
             channel.basic_qos(prefetch_count=1)
-            channel.basic_consume(queue=queue, on_message_callback=on_message, auto_ack=False)
+            channel.basic_consume(
+                queue=queue, on_message_callback=on_message, auto_ack=False
+            )
             log(service, f"aguardando mensagens em '{queue}' (Ctrl+C para sair)")
             channel.start_consuming()
         except KeyboardInterrupt:
@@ -225,7 +232,10 @@ def run_consumer(service, queue, callback):
             break
         except pika.exceptions.ChannelClosedByBroker as exc:
             if exc.reply_code == 404:
-                log(service, f"fila '{queue}' não existe. Rode: python workers/setup_broker.py")
+                log(
+                    service,
+                    f"fila '{queue}' não existe. Rode: python workers/setup_broker.py",
+                )
             else:
                 log(service, f"canal fechado pelo broker: {exc}")
         except pika.exceptions.AMQPError as exc:
